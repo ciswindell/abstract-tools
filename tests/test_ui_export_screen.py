@@ -16,7 +16,8 @@ def test_export_screen_summary_and_export(qtbot, make_pdf, tmp_path):
     model = SegmentationModel(result.sources)
 
     screen = ExportScreen(
-        result, model, on_back=lambda: None, on_new_lease=lambda: None
+        result, model, on_back=lambda: None, on_new_lease=lambda: None,
+        on_back_to_tools=lambda: None,
     )
     qtbot.addWidget(screen)
     summary_text = screen.summary_label.text()

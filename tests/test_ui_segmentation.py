@@ -14,7 +14,8 @@ def _model(make_pdf):
 
 
 def _screen(model):
-    return SegmentationScreen(model, "B11294", on_continue=lambda: None)
+    return SegmentationScreen(model, "B11294", on_continue=lambda: None,
+                              on_back_to_tools=lambda: None)
 
 
 def test_classify_buttons_show_current_state_by_color(qtbot, make_pdf):
