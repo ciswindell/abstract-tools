@@ -46,11 +46,13 @@ def tools_by_category() -> dict[str, list[Tool]]:
 - `show_board()`: removes the current tool widget (dropping its state) and shows the board.
 - No segmentation-specific logic remains in `MainWindow`.
 
-### NMSLO Segmentor tool — `src/aa_tool/ui/segmentor/`
-The current folder→segment→export orchestration (today in `MainWindow`) moves into a `SegmentorTool(QWidget)` that owns its own `QStackedWidget` of the three screens and the `ingest_result` / `model` state. Files move into a `segmentor/` package:
-- `segmentor/tool.py` — `SegmentorTool` (folder-open screen + `load_lease` + `show_export` + internal navigation; accepts `on_back_to_tools`).
-- `segmentor/segmentation_screen.py`, `segmentor/export_screen.py` — moved, unchanged in behavior except the header.
-- `tools.py` defines `SEGMENTOR_TOOL = Tool(..., build=lambda on_back: SegmentorTool(on_back))`.
+### NMSLO Segmentor tool — `src/aa_tool/ui/nmslo_segmentor/`
+The package is named per-agency (`nmslo_segmentor`) because future agencies (BLM, county, …) will each get their own segmentor package. The current folder→segment→export orchestration (today in `MainWindow`) moves into a `NmsloSegmentorTool(QWidget)` that owns its own `QStackedWidget` of the three screens and the `ingest_result` / `model` state. Files move into the package:
+- `nmslo_segmentor/tool.py` — `NmsloSegmentorTool` (folder-open screen + `load_lease` + `show_export` + internal navigation; accepts `on_back_to_tools`).
+- `nmslo_segmentor/segmentation_screen.py`, `nmslo_segmentor/export_screen.py` — moved, unchanged in behavior except the header.
+- `tools.py` defines `SEGMENTOR_TOOL = Tool(id="nmslo_segmentor", ..., build=lambda on_back: NmsloSegmentorTool(on_back))`.
+
+(When a second segmentor is built, shared segmentation UI can be extracted into a common base then — not now.)
 
 The segmentor's "Process another lease" returns to the tool's own open screen (resetting lease state) — distinct from "Back to Tools" which exits to the board.
 
@@ -69,16 +71,16 @@ Tool icons are bundled SVGs under `src/aa_tool/resources/icons/` (pine stroke, l
 Reuse the existing paper theme (`theme.py`): `--paper`/`--card`/`--pine`, Hanken Grotesk + Spline Sans Mono. New `theme.py` styles: board top bar + logo mark, hero, section header (`#secHead` + rule), `#toolCard` (hover lifts + pine border), card icon tile, and the `#backToTools` link. Approved mockups: a centered hero, agency section headers with a rule, lift-on-hover cards; the Back-to-Tools link at the far left of the tool top bar followed by a divider and context.
 
 ## Component boundaries (what depends on what)
-- `tools.py` depends on `segmentor/tool.py` (to build it) — pure data + one import.
+- `tools.py` depends on `nmslo_segmentor/tool.py` (to build it) — pure data + one import.
 - `home_board.py` depends only on `tools.py` (registry) — knows nothing about any specific tool.
 - `main_window.py` depends on `home_board.py` + `tools.py` — knows nothing about segmentation.
-- `segmentor/` depends on the existing core (`ingest`, `model`, `export`, `render`) — unchanged.
+- `nmslo_segmentor/` depends on the existing core (`ingest`, `model`, `export`, `render`) — unchanged.
 
 ## Testing approach (TDD, synthetic fixtures only)
 - **Registry:** `TOOLS` contains the segmentor with the right id/name/category; its `icon` resource resolves via `resource_path` and exists.
 - **HomeBoard (headless, offscreen):** building it from a 1-tool registry creates one section and one card; clicking the card invokes `on_launch` with `"nmslo_segmentor"`.
 - **MainWindow (headless):** `launch_tool("nmslo_segmentor")` shows a tool widget; `show_board()` returns to the board and drops the tool widget.
-- **SegmentorTool (headless):** `load_lease(folder)` ingests and builds the model (the moved version of the current main-window test); "Back to Tools" calls `on_back_to_tools`.
+- **NmsloSegmentorTool (headless):** `load_lease(folder)` ingests and builds the model (the moved version of the current main-window test); "Back to Tools" calls `on_back_to_tools`.
 - **Existing segmentor tests** are updated for the moved module paths and the new `Header` signature; their behavior assertions are unchanged.
 - All tests run headless via `QT_QPA_PLATFORM=offscreen`; real data in `example/` is never used.
 
