@@ -22,7 +22,7 @@
 - A document's `Source` and `Assignment` are inherited from its first page. Multiple documents from one source PDF share that Source number.
 - The very first merged page is always a First Page and cannot be demoted to Continuation.
 
-**Excel approach note:** The exporter builds the workbook from scratch in code (not by copying `example/output/Template File Documents.xlsx`, which is excluded data). Output columns/formula match the template; exact cell styling can be tuned later against the real template.
+**Excel approach note:** The exporter copies a bundled template, `src/aa_tool/resources/Template File Documents.xlsx` (already committed — a cleaned copy of the real template: header row + column widths + frozen header, no data rows), then fills one row per document starting at row 2. This preserves the staff's exact column order, widths, and frozen header. The template is loaded via a resource-path helper that works both from source and from inside the PyInstaller bundle.
 
 ---
 
@@ -597,19 +597,67 @@ git commit -m "feat: PDF exporter merges sources and writes bookmarks"
 
 ---
 
-### Task 6: Excel exporter — build the index workbook
+### Task 6: Resource-path helper and Excel exporter (copies bundled template)
 
 **Files:**
+- Create: `src/aa_tool/resources.py`
 - Create: `src/aa_tool/excel_export.py`
+- Existing (already committed): `src/aa_tool/resources/Template File Documents.xlsx`
+- Test: `tests/test_resources.py`
 - Test: `tests/test_excel_export.py`
 
 **Interfaces:**
-- Consumes: `Document` (model).
+- Consumes: `Document` (model); the bundled template file.
 - Produces:
-  - module constant `COLUMNS: list[str]` (the 17 headers in order).
-  - `export_excel(documents: list[Document], out_path: Path) -> None`.
+  - `resource_path(name: str) -> Path` in `aa_tool.resources` — returns the absolute path to a bundled resource, working both from source (`src/aa_tool/resources/<name>`) and from a PyInstaller one-file bundle (`sys._MEIPASS/aa_tool/resources/<name>`).
+  - module constant `COLUMNS: list[str]` (the 17 headers in order, for column-index reference).
+  - `TEMPLATE_NAME = "Template File Documents.xlsx"`.
+  - `export_excel(documents: list[Document], out_path: Path) -> None` — copies the bundled template, fills one row per document starting at row 2, saves to `out_path`.
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Write the failing test for `resource_path` `tests/test_resources.py`**
+
+```python
+from aa_tool.resources import resource_path
+
+
+def test_resource_path_points_at_bundled_template():
+    path = resource_path("Template File Documents.xlsx")
+    assert path.exists()
+    assert path.name == "Template File Documents.xlsx"
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `python -m pytest tests/test_resources.py -v`
+Expected: FAIL with `ModuleNotFoundError: No module named 'aa_tool.resources'`.
+
+Note: `aa_tool.resources` is a *module* (`resources.py`); the bundled file lives in the `resources/` *directory* beside it. Both can coexist — Python imports the `.py` file, and the helper reads from the directory by path.
+
+- [ ] **Step 3: Write `src/aa_tool/resources.py`**
+
+```python
+import sys
+from pathlib import Path
+
+
+def resource_path(name: str) -> Path:
+    """Absolute path to a bundled resource.
+
+    Works from source (src/aa_tool/resources/<name>) and from a PyInstaller
+    one-file bundle, where data files are unpacked under sys._MEIPASS.
+    """
+    base = getattr(sys, "_MEIPASS", None)
+    if base is not None:
+        return Path(base) / "aa_tool" / "resources" / name
+    return Path(__file__).resolve().parent / "resources" / name
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `python -m pytest tests/test_resources.py -v`
+Expected: PASS.
+
+- [ ] **Step 5: Write the failing test for the Excel exporter `tests/test_excel_export.py`**
 
 ```python
 from pathlib import Path
@@ -627,14 +675,18 @@ def _doc(index, file_number, assignment):
     return Document(index=index, pages=[page])
 
 
-def test_export_excel_headers_and_rows(tmp_path):
+def test_export_excel_uses_template_headers_and_fills_rows(tmp_path):
     docs = [_doc(1, "368481", "0"), _doc(2, "368495", "0"), _doc(3, "368495", "0")]
     out = tmp_path / "B11294 File Documents.xlsx"
     export_excel(docs, out)
 
     wb = load_workbook(out)
     ws = wb["Index"]
+    # Headers come from the bundled template, in the exact order.
     assert [c.value for c in ws[1]] == COLUMNS
+    assert ws.title == "Index"
+    # Frozen header preserved from template.
+    assert ws.freeze_panes == "A2"
     # Row 2 (first document)
     assert ws.cell(row=2, column=1).value == 368481          # Source (numeric)
     assert ws.cell(row=2, column=2).value == 0               # Assignment Number
@@ -645,22 +697,26 @@ def test_export_excel_headers_and_rows(tmp_path):
     # Row 4 (third document, same source repeats)
     assert ws.cell(row=4, column=1).value == 368495
     assert ws.cell(row=4, column=5).value == 3
+    # No stray data rows beyond the documents.
+    assert ws.max_row == 4
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 6: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_excel_export.py -v`
 Expected: FAIL with `ModuleNotFoundError: No module named 'aa_tool.excel_export'`.
 
-- [ ] **Step 3: Write `src/aa_tool/excel_export.py`**
+- [ ] **Step 7: Write `src/aa_tool/excel_export.py`**
 
 ```python
 from pathlib import Path
 
-from openpyxl import Workbook
-from openpyxl.styles import Font
+from openpyxl import load_workbook
 
 from aa_tool.model import Document
+from aa_tool.resources import resource_path
+
+TEMPLATE_NAME = "Template File Documents.xlsx"
 
 COLUMNS = [
     "Source",
@@ -689,13 +745,8 @@ def _as_number(value: str):
 
 
 def export_excel(documents: list[Document], out_path: Path) -> None:
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Index"
-
-    ws.append(COLUMNS)
-    for cell in ws[1]:
-        cell.font = Font(bold=True)
+    wb = load_workbook(resource_path(TEMPLATE_NAME))
+    ws = wb["Index"]
 
     for doc in documents:
         r = doc.index + 1  # header occupies row 1
@@ -712,16 +763,16 @@ def export_excel(documents: list[Document], out_path: Path) -> None:
     wb.save(out_path)
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [ ] **Step 8: Run test to verify it passes**
 
-Run: `python -m pytest tests/test_excel_export.py -v`
-Expected: PASS.
+Run: `python -m pytest tests/test_excel_export.py tests/test_resources.py -v`
+Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
-git add src/aa_tool/excel_export.py tests/test_excel_export.py
-git commit -m "feat: Excel index exporter"
+git add src/aa_tool/resources.py src/aa_tool/excel_export.py tests/test_resources.py tests/test_excel_export.py
+git commit -m "feat: Excel exporter copies bundled template; resource-path helper"
 ```
 
 ---
@@ -1436,7 +1487,11 @@ a = Analysis(
     ["main.py"],
     pathex=["src"],
     binaries=[],
-    datas=[],
+    # Bundle the Excel template into aa_tool/resources/ inside the one-file build,
+    # matching the layout resource_path() expects under sys._MEIPASS.
+    datas=[
+        ("src/aa_tool/resources/Template File Documents.xlsx", "aa_tool/resources"),
+    ],
     hiddenimports=[],
     hookspath=[],
     runtime_hooks=[],
@@ -1541,7 +1596,7 @@ git commit -m "build: PyInstaller spec, Windows CI workflow, and README"
 - Segmentation (pre-marked boundaries, First/Continuation, preview, buttons above preview, shortcuts) → Tasks 3, 7, 10. ✓
 - Three screens (pick / segment / export) → Tasks 9, 10, 11. ✓
 - Output PDF naming + bookmarks + NA label → Tasks 4, 5, 8. ✓
-- Output Excel naming + columns + formula + Unknown/blank → Task 6. ✓
+- Output Excel naming + columns + formula + Unknown/blank → Task 6 (copies bundled template `src/aa_tool/resources/Template File Documents.xlsx`, bundled into the exe via Task 12 spec `datas`). ✓
 - Source/Assignment provenance, repeated source numbers → Tasks 2, 3, 6 (tested). ✓
 - Ordering rules + skip non-PDF/unreadable + missing subfolders → Task 2 (tested); skipped surfaced in Task 11. ✓
 - PySide6 / PyMuPDF / openpyxl / PyInstaller → Tasks 6–12. ✓
