@@ -158,6 +158,7 @@ QLabel#savePath {{
 
 /* ---- Home board ---- */
 QWidget#boardTop {{ background: {CARD}; border-bottom: 1px solid {LINE}; }}
+QWidget#boardBody {{ background: {PAPER}; }}
 QLabel#boardBrand {{ font-family: "{SANS}"; font-size: 19px; font-weight: 800; letter-spacing: -0.3px; }}
 QLabel#boardHero {{ font-family: "{SANS}"; font-size: 34px; font-weight: 800; letter-spacing: -0.8px; }}
 QLabel#boardHeroSub {{ font-size: 15px; color: {INK_SOFT}; }}

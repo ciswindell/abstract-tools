@@ -61,11 +61,10 @@ class HomeBoard(QtWidgets.QWidget):
         outer.addWidget(top)
 
         scroll = QtWidgets.QScrollArea()
-        scroll.setObjectName("screen")
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
         inner = QtWidgets.QWidget()
-        inner.setObjectName("screen")
+        inner.setObjectName("boardBody")
         body = QtWidgets.QVBoxLayout(inner)
         body.setContentsMargins(28, 30, 28, 60)
         body.setSpacing(0)
