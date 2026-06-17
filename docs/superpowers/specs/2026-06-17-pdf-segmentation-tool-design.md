@@ -86,6 +86,13 @@ PyInstaller cannot cross-compile — it bundles the interpreter and libraries fo
 - The workflow triggers on push/tag and uploads the `.exe` as a downloadable artifact (and optionally attaches it to a GitHub Release for a clean staff download link).
 - Development and testing happen locally on Linux (PDF/Excel logic and the Qt UI both run on Linux); Windows is only needed for the final packaging step, handled by GitHub. The project will be a git repo pushed to GitHub.
 
+## Testing approach
+
+- Built with **TDD** — write the failing test first, then the code to pass it, for every unit.
+- The `example/` folder (real lease data) is **never** used in automated tests and is not committed. It may be used locally for ad-hoc manual testing only.
+- Tests use **synthetic fixtures generated in-test** — e.g. tiny multi-page PDFs built on the fly with PyMuPDF — so the suite is self-contained, deterministic, and carries no real data.
+- The PDF/Excel/model units are pure-Python and testable headlessly on Linux; the Qt UI is kept thin so logic lives in tested units rather than in widgets.
+
 ## Edge-case decisions
 
 - **Ordering:** numeric by subfolder then file number; alphabetical fallback with a note if a name is non-numeric.
