@@ -5,9 +5,9 @@ from PySide6 import QtCore, QtWidgets
 from aa_tool.ingest import scan_lease_folder
 from aa_tool.model import SegmentationModel
 from aa_tool.ui import theme
-from aa_tool.ui.export_screen import ExportScreen
 from aa_tool.ui.header import Header
-from aa_tool.ui.segmentation_screen import SegmentationScreen
+from aa_tool.ui.nmslo_segmentor.export_screen import ExportScreen
+from aa_tool.ui.nmslo_segmentor.segmentation_screen import SegmentationScreen
 
 
 class MainWindow(QtWidgets.QMainWindow):
