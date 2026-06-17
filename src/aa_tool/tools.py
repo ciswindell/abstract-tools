@@ -20,3 +20,20 @@ def tools_by_category(tools: list[Tool]) -> dict[str, list[Tool]]:
     for tool in tools:
         grouped.setdefault(tool.category, []).append(tool)
     return grouped
+
+
+from aa_tool.ui.nmslo_segmentor.tool import NmsloSegmentorTool
+
+SEGMENTOR_TOOL = Tool(
+    id="nmslo_segmentor",
+    name="NMSLO Segmentor",
+    description=(
+        "Merge a lease file's PDFs, mark the first page of each document, "
+        "and export a bookmarked PDF plus an Excel index."
+    ),
+    category="NM State Land Office",
+    icon="icons/segmentor.svg",
+    build=lambda on_back: NmsloSegmentorTool(on_back),
+)
+
+TOOLS: list[Tool] = [SEGMENTOR_TOOL]

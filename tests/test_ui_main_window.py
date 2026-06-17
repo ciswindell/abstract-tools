@@ -5,7 +5,15 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from aa_tool.ui.main_window import MainWindow
 
 
-def test_main_window_constructs(qtbot):
+def test_starts_on_board_then_launches_and_returns(qtbot):
     window = MainWindow()
     qtbot.addWidget(window)
-    assert window.windowTitle() == "Abstract Tools"
+
+    # Starts on the board.
+    assert window.stack.currentWidget() is window.board
+
+    window.launch_tool("nmslo_segmentor")
+    assert window.stack.currentWidget() is not window.board
+
+    window.show_board()
+    assert window.stack.currentWidget() is window.board
