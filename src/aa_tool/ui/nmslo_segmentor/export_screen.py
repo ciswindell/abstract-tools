@@ -6,6 +6,7 @@ from PySide6 import QtCore, QtWidgets
 from aa_tool.export import ExportSummary, build_summary, run_export
 from aa_tool.ingest import IngestResult
 from aa_tool.model import SegmentationModel
+from aa_tool.ui import theme
 from aa_tool.ui.header import Header
 
 
@@ -16,6 +17,7 @@ class ExportScreen(QtWidgets.QWidget):
         model: SegmentationModel,
         on_back: Callable[[], None],
         on_new_lease: Callable[[], None],
+        on_back_to_tools: Callable[[], None],
     ):
         super().__init__()
         self.setObjectName("screen")
@@ -23,12 +25,17 @@ class ExportScreen(QtWidgets.QWidget):
         self.model = model
         self.on_back = on_back
         self.on_new_lease = on_new_lease
+        self.on_back_to_tools = on_back_to_tools
         self.out_dir = self._default_out_dir()
 
         outer = QtWidgets.QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
-        outer.addWidget(Header(active_step=3, lease=ingest_result.lease_number))
+        outer.addWidget(Header(
+            active_step=3,
+            context_html=f'Lease&nbsp;<span style="color:{theme.PINE}">{ingest_result.lease_number}</span>',
+            on_back_to_tools=on_back_to_tools,
+        ))
 
         documents = self.model.documents()
         doc_count, page_count, source_count, _assignments = build_summary(

@@ -4,7 +4,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from aa_tool.ingest import SourcePdf
 from aa_tool.model import SegmentationModel
-from aa_tool.ui.segmentation_screen import SegmentationScreen
+from aa_tool.ui.nmslo_segmentor.segmentation_screen import SegmentationScreen
 
 
 def _model(make_pdf):
@@ -14,7 +14,8 @@ def _model(make_pdf):
 
 
 def _screen(model):
-    return SegmentationScreen(model, "B11294", on_continue=lambda: None)
+    return SegmentationScreen(model, "B11294", on_continue=lambda: None,
+                              on_back_to_tools=lambda: None)
 
 
 def test_classify_buttons_show_current_state_by_color(qtbot, make_pdf):

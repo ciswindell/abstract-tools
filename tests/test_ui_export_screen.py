@@ -4,7 +4,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from aa_tool.ingest import scan_lease_folder
 from aa_tool.model import SegmentationModel
-from aa_tool.ui.export_screen import ExportScreen
+from aa_tool.ui.nmslo_segmentor.export_screen import ExportScreen
 
 
 def test_export_screen_summary_and_export(qtbot, make_pdf, tmp_path):
@@ -16,7 +16,8 @@ def test_export_screen_summary_and_export(qtbot, make_pdf, tmp_path):
     model = SegmentationModel(result.sources)
 
     screen = ExportScreen(
-        result, model, on_back=lambda: None, on_new_lease=lambda: None
+        result, model, on_back=lambda: None, on_new_lease=lambda: None,
+        on_back_to_tools=lambda: None,
     )
     qtbot.addWidget(screen)
     summary_text = screen.summary_label.text()

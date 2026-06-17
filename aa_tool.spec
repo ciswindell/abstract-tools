@@ -9,6 +9,7 @@ a = Analysis(
     datas=[
         ("src/aa_tool/resources/Template File Documents.xlsx", "aa_tool/resources"),
         ("src/aa_tool/resources/fonts/*.ttf", "aa_tool/resources/fonts"),
+        ("src/aa_tool/resources/icons/*.svg", "aa_tool/resources/icons"),
     ],
     hiddenimports=[],
     hookspath=[],

@@ -11,6 +11,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 from aa_tool.model import SegmentationModel
 from aa_tool.render import page_size, render_page_png
+from aa_tool.ui import theme
 from aa_tool.ui.header import Header
 
 _ZOOM_STEP = 1.2
@@ -70,11 +71,13 @@ class SegmentationScreen(QtWidgets.QWidget):
         model: SegmentationModel,
         lease_number: str,
         on_continue: Callable[[], None],
+        on_back_to_tools: Callable[[], None],
     ):
         super().__init__()
         self.setObjectName("screen")
         self.model = model
         self.on_continue = on_continue
+        self.on_back_to_tools = on_back_to_tools
         self.selected_index = 0
         self._zoom = None  # explicit zoom factor, or None when a fit mode is active
         self._fit = "width"  # "width" | "page" | None
@@ -86,7 +89,11 @@ class SegmentationScreen(QtWidgets.QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
 
-        self.header = Header(active_step=2, lease=lease_number)
+        self.header = Header(
+            active_step=2,
+            context_html=f'Lease&nbsp;<span style="color:{theme.PINE}">{lease_number}</span>',
+            on_back_to_tools=on_back_to_tools,
+        )
         outer.addWidget(self.header)
 
         body = QtWidgets.QHBoxLayout()

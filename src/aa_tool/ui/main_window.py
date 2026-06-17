@@ -1,13 +1,8 @@
-from pathlib import Path
+from PySide6 import QtWidgets
 
-from PySide6 import QtCore, QtWidgets
-
-from aa_tool.ingest import scan_lease_folder
-from aa_tool.model import SegmentationModel
+from aa_tool import tools as tools_module
 from aa_tool.ui import theme
-from aa_tool.ui.export_screen import ExportScreen
-from aa_tool.ui.header import Header
-from aa_tool.ui.segmentation_screen import SegmentationScreen
+from aa_tool.ui.home_board import HomeBoard
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -19,96 +14,28 @@ class MainWindow(QtWidgets.QMainWindow):
         self.stack = QtWidgets.QStackedWidget()
         self.setCentralWidget(self.stack)
 
-        self.ingest_result = None
-        self.model: SegmentationModel | None = None
-        self._segmentation_screen: SegmentationScreen | None = None
-        self._export_screen: ExportScreen | None = None
+        self._tools = {t.id: t for t in tools_module.TOOLS}
+        self.board = HomeBoard(tools_module.TOOLS, on_launch=self.launch_tool)
+        self.stack.addWidget(self.board)
 
-        self._build_folder_screen()
+        self._current_tool = None
 
-    def _build_folder_screen(self):
-        page = QtWidgets.QWidget()
-        page.setObjectName("screen")
-        v = QtWidgets.QVBoxLayout(page)
-        v.setContentsMargins(0, 0, 0, 0)
-        v.setSpacing(0)
-        v.addWidget(Header(active_step=1))
+    def launch_tool(self, tool_id: str) -> None:
+        tool = self._tools[tool_id]
+        widget = tool.build(self.show_board)
+        if self._current_tool is not None:
+            self.stack.removeWidget(self._current_tool)
+            self._current_tool.deleteLater()
+        self._current_tool = widget
+        self.stack.addWidget(widget)
+        self.stack.setCurrentWidget(widget)
 
-        center = QtWidgets.QVBoxLayout()
-        center.setContentsMargins(0, 0, 0, 0)
-        center.setSpacing(14)
-        center.addStretch()
-        h1 = QtWidgets.QLabel("Open a lease file")
-        h1.setObjectName("h1")
-        h1.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        sub = QtWidgets.QLabel(
-            "Choose a lease folder. Its PDFs are merged so you can mark the\n"
-            "first page of each document, then export a bookmarked PDF and an index."
-        )
-        sub.setObjectName("sub")
-        sub.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        button = QtWidgets.QPushButton("Choose lease folder…")
-        button.setObjectName("primary")
-        button.clicked.connect(self._choose_folder)
-        center.addWidget(h1)
-        center.addWidget(sub)
-        center.addSpacing(8)
-        center.addWidget(button, alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
-        center.addStretch()
-        v.addLayout(center, 1)
-
-        self.folder_index = self.stack.addWidget(page)
-
-    def _choose_folder(self):
-        folder = QtWidgets.QFileDialog.getExistingDirectory(
-            self, "Choose lease folder", str(Path.home())
-        )
-        if folder:
-            self.load_lease(Path(folder))
-
-    def _swap_in(self, screen: QtWidgets.QWidget, previous: QtWidgets.QWidget | None) -> None:
-        if previous is not None:
-            self.stack.removeWidget(previous)
-            previous.deleteLater()
-        index = self.stack.addWidget(screen)
-        self.stack.setCurrentIndex(index)
-
-    def load_lease(self, folder: Path) -> None:
-        self.ingest_result = scan_lease_folder(folder)
-        self.model = SegmentationModel(self.ingest_result.sources)
-        screen = SegmentationScreen(
-            self.model,
-            self.ingest_result.lease_number,
-            on_continue=self._show_export_screen,
-        )
-        self._swap_in(screen, self._segmentation_screen)
-        self._segmentation_screen = screen
-
-    def _show_export_screen(self) -> None:
-        screen = ExportScreen(
-            self.ingest_result,
-            self.model,
-            on_back=self._back_to_segmentation,
-            on_new_lease=self.start_over,
-        )
-        self._swap_in(screen, self._export_screen)
-        self._export_screen = screen
-
-    def _back_to_segmentation(self) -> None:
-        if self._segmentation_screen is not None:
-            self.stack.setCurrentWidget(self._segmentation_screen)
-
-    def start_over(self) -> None:
-        """Return to the folder picker and drop the current lease's state."""
-        self.stack.setCurrentIndex(self.folder_index)
-        for attr in ("_segmentation_screen", "_export_screen"):
-            screen = getattr(self, attr)
-            if screen is not None:
-                self.stack.removeWidget(screen)
-                screen.deleteLater()
-                setattr(self, attr, None)
-        self.ingest_result = None
-        self.model = None
+    def show_board(self) -> None:
+        self.stack.setCurrentWidget(self.board)
+        if self._current_tool is not None:
+            self.stack.removeWidget(self._current_tool)
+            self._current_tool.deleteLater()
+            self._current_tool = None
 
 
 def main() -> None:
