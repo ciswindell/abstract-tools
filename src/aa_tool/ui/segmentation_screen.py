@@ -92,11 +92,7 @@ class SegmentationScreen(QtWidgets.QWidget):
 
     def _update_preview(self) -> None:
         page = self.model.pages[self.selected_index]
-        try:
-            png = render_page_png(page.source.path, page.source_page_index)
-        except Exception:
-            self.preview.clear()
-            return
+        png = render_page_png(page.source.path, page.source_page_index)
         pixmap = QtGui.QPixmap()
         pixmap.loadFromData(png)
         self.preview.setPixmap(pixmap)
