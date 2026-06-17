@@ -1,5 +1,4 @@
 # -*- mode: python ; coding: utf-8 -*-
-block_cipher = None
 
 a = Analysis(
     ["main.py"],
@@ -14,9 +13,8 @@ a = Analysis(
     hookspath=[],
     runtime_hooks=[],
     excludes=[],
-    cipher=block_cipher,
 )
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure, a.zipped_data)
 exe = EXE(
     pyz,
     a.scripts,
@@ -28,5 +26,4 @@ exe = EXE(
     strip=False,
     upx=False,
     console=False,
-    onefile=True,
 )

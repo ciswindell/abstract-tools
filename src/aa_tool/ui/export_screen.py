@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from pathlib import Path
 
-from PySide6 import QtCore, QtWidgets
+from PySide6 import QtWidgets
 
 from aa_tool.export import ExportSummary, build_summary, run_export
 from aa_tool.ingest import IngestResult
@@ -63,14 +63,9 @@ class ExportScreen(QtWidgets.QWidget):
         return run_export(self.ingest_result, documents, self.out_dir)
 
     def _on_export_clicked(self) -> None:
-        chosen = QtWidgets.QFileDialog.getExistingDirectory(
-            self, "Choose output folder", str(self.out_dir)
-        )
-        if chosen:
-            self.out_dir = Path(chosen)
+        chosen = QtWidgets.QFileDialog.getExistingDirectory(self, "Choose output folder", str(self.out_dir))
+        if not chosen:
+            return
+        self.out_dir = Path(chosen)
         summary = self.do_export()
-        QtWidgets.QMessageBox.information(
-            self,
-            "Export complete",
-            f"Saved:\n{summary.pdf_path.name}\n{summary.xlsx_path.name}",
-        )
+        QtWidgets.QMessageBox.information(self, "Export complete", f"Saved:\n{summary.pdf_path.name}\n{summary.xlsx_path.name}")

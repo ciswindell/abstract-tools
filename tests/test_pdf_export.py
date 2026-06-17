@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import fitz
 
 from aa_tool.ingest import scan_lease_folder
