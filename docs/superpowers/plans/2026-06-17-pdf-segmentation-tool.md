@@ -61,6 +61,7 @@ requires-python = ">=3.12"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+pythonpath = ["src"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
