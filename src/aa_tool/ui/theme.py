@@ -168,6 +168,14 @@ QFrame#toolCard:hover {{ border-color: {PINE}; }}
 QLabel#toolCardName {{ font-size: 16px; font-weight: 700; }}
 QLabel#toolCardDesc {{ font-size: 13px; color: {INK_SOFT}; }}
 QLabel#toolCardIcon {{ background: #e7efe9; border-radius: 11px; }}
+
+/* ---- Back to Tools link ---- */
+QPushButton#backToTools {{
+    background: transparent; border: none; color: {PINE};
+    font-weight: 700; font-size: 14px; padding: 0; text-align: left;
+}}
+QPushButton#backToTools:hover {{ color: {PINE_DEEP}; }}
+QFrame#hdrDivider {{ background: {LINE}; max-width: 1px; min-width: 1px; }}
 """
 
 

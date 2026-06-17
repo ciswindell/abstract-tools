@@ -1,29 +1,47 @@
-"""Shared top bar used by every screen, so the app reads as one tool.
-
-Shows the lease number, a 1·Open / 2·Segment / 3·Export step indicator, and a
-right-hand area for screen-specific status (a progress pill + a status line).
+"""Shared top bar. On a tool screen it shows a Back-to-Tools link, the tool or
+lease context, a step indicator, and an optional progress pill.
 """
 
-from PySide6 import QtCore, QtWidgets
+from collections.abc import Callable
 
-from aa_tool.ui import theme
+from PySide6 import QtCore, QtWidgets
 
 _STEPS = ["1 · Open", "2 · Segment", "3 · Export"]
 
 
 class Header(QtWidgets.QWidget):
-    def __init__(self, active_step: int, lease: str | None = None):
+    def __init__(
+        self,
+        active_step: int,
+        context_html: str = "",
+        on_back_to_tools: Callable[[], None] | None = None,
+        lease: str | None = None,
+    ):
         super().__init__()
         self.setObjectName("header")
 
         layout = QtWidgets.QHBoxLayout(self)
         layout.setContentsMargins(22, 11, 22, 11)
-        layout.setSpacing(18)
+        layout.setSpacing(16)
+
+        self.back_button = None
+        if on_back_to_tools is not None:
+            self.back_button = QtWidgets.QPushButton("←  Back to Tools")
+            self.back_button.setObjectName("backToTools")
+            self.back_button.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+            self.back_button.clicked.connect(lambda: on_back_to_tools())
+            layout.addWidget(self.back_button)
+            divider = QtWidgets.QFrame()
+            divider.setObjectName("hdrDivider")
+            divider.setFixedHeight(22)
+            layout.addWidget(divider)
 
         brand = QtWidgets.QLabel()
         brand.setObjectName("brand")
-        if lease:
-            brand.setText(f'Lease&nbsp;<span style="color:{theme.PINE}">{lease}</span>')
+        if context_html:
+            brand.setText(context_html)
+        elif lease:
+            brand.setText(f"Lease&nbsp;{lease}")
         else:
             brand.setText("Abstract Tools")
         layout.addWidget(brand)
@@ -35,7 +53,6 @@ class Header(QtWidgets.QWidget):
 
         layout.addStretch()
 
-        # Progress pill (hidden until set_progress is called).
         self._pill_wrap = QtWidgets.QWidget()
         pill_row = QtWidgets.QHBoxLayout(self._pill_wrap)
         pill_row.setContentsMargins(0, 0, 0, 0)
@@ -49,17 +66,6 @@ class Header(QtWidgets.QWidget):
         pill_row.addWidget(self._pill_text)
         self._pill_wrap.setVisible(False)
         layout.addWidget(self._pill_wrap)
-
-        # Status line (hidden until set_status is called).
-        self._status = QtWidgets.QLabel()
-        self._status.setObjectName("status")
-        self._status.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
-        self._status.setVisible(False)
-        layout.addWidget(self._status)
-
-    def set_status(self, text: str) -> None:
-        self._status.setText(text)
-        self._status.setVisible(True)
 
     def set_progress(self, value: int, maximum: int, text: str) -> None:
         self._bar.setMaximum(max(maximum, 1))
