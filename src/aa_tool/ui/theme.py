@@ -65,7 +65,15 @@ QWidget#rail {{ border-right: 1px solid {LINE}; }}
 QLabel#railTitle {{
     font-size: 11px; color: {INK_SOFT}; font-weight: 600; padding: 4px 6px;
 }}
-QLabel#docHead {{ font-family: "{MONO}"; font-size: 12px; color: {PINE_DEEP}; font-weight: 600; }}
+QLabel#railTitle {{
+    font-size: 11px; color: {INK_SOFT}; font-weight: 600; padding: 4px 6px;
+}}
+/* Classification dots in front of each page row. */
+QFrame#dotNone {{ background: transparent; border-radius: 4px; }}
+QFrame#dotFirst {{ background: {GREEN}; border-radius: 4px; }}
+QFrame#dotCont {{ background: {YELLOW}; border-radius: 4px; }}
+/* Hairline between source files. */
+QFrame#railSep {{ background: #d3c9b6; }}
 QFrame#pageRow {{ background: transparent; border-radius: 7px; }}
 QFrame#pageRow:hover {{ background: #e2d9c8; }}
 QFrame#pageRowCur {{ background: {CARD}; border-radius: 7px; border: 2px solid {PINE}; }}

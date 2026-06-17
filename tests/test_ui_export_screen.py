@@ -15,7 +15,9 @@ def test_export_screen_summary_and_export(qtbot, make_pdf, tmp_path):
     result = scan_lease_folder(lease)
     model = SegmentationModel(result.sources)
 
-    screen = ExportScreen(result, model, on_back=lambda: None)
+    screen = ExportScreen(
+        result, model, on_back=lambda: None, on_new_lease=lambda: None
+    )
     qtbot.addWidget(screen)
     summary_text = screen.summary_label.text()
     assert "2 source files merged" in summary_text

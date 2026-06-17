@@ -24,25 +24,35 @@ def test_preseeds_boundary_at_each_source_start():
     ]
 
 
-def test_split_inside_source_and_merge_across_sources():
+def test_split_inside_source():
     sources = [SourcePdf(Path("368495.pdf"), "368495", "0", 4),
                SourcePdf(Path("368521.pdf"), "368521", "1", 1)]
     model = SegmentationModel(sources)
 
     # Split 368495 into two documents at its page index 2 (global 2).
     model.set_first_page(2)
-    # Merge 368521 into the previous document (document spans two sources).
-    model.set_continuation(4)
 
     docs = model.documents()
     assert [(d.index, d.source, d.assignment, [p.global_index for p in d.pages]) for d in docs] == [
         (1, "368495", "0", [0, 1]),
-        (2, "368495", "0", [2, 3, 4]),
+        (2, "368495", "0", [2, 3]),
+        (3, "368521", "1", [4]),
     ]
 
 
-def test_first_page_cannot_be_continuation():
-    sources = [SourcePdf(Path("368495.pdf"), "368495", "0", 2)]
+def test_first_page_of_a_source_cannot_be_continuation():
+    # The first page of EVERY source file (not just global page 0) must stay a
+    # first page, so each source remains traceable via its Source column.
+    sources = [SourcePdf(Path("368495.pdf"), "368495", "0", 4),
+               SourcePdf(Path("368521.pdf"), "368521", "1", 1)]
     model = SegmentationModel(sources)
+
     with pytest.raises(ValueError):
-        model.set_continuation(0)
+        model.set_continuation(0)  # first page of first source
+    with pytest.raises(ValueError):
+        model.set_continuation(4)  # first page of second source
+
+    # An interior page can still be made a continuation.
+    model.set_first_page(2)
+    model.set_continuation(2)
+    assert model.is_first_page(2) is False

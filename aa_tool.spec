@@ -22,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.zipfiles,
     a.datas,
-    name="AA State Abstract Tool",
+    name="Abstract Tools",
     debug=False,
     strip=False,
     upx=False,

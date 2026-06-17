@@ -26,5 +26,5 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: aa-state-abstract-tool
-          path: "dist/AA State Abstract Tool.exe"
+          name: abstract-tools
+          path: "dist/Abstract Tools.exe"

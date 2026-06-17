@@ -15,12 +15,14 @@ class ExportScreen(QtWidgets.QWidget):
         ingest_result: IngestResult,
         model: SegmentationModel,
         on_back: Callable[[], None],
+        on_new_lease: Callable[[], None],
     ):
         super().__init__()
         self.setObjectName("screen")
         self.ingest_result = ingest_result
         self.model = model
         self.on_back = on_back
+        self.on_new_lease = on_new_lease
         self.out_dir = self._default_out_dir()
 
         outer = QtWidgets.QVBoxLayout(self)
@@ -104,6 +106,14 @@ class ExportScreen(QtWidgets.QWidget):
         center.addSpacing(6)
         center.addWidget(self.result_label)
 
+        # Shown after export so the user can move on to the next lease.
+        self.new_lease_button = QtWidgets.QPushButton("Process another lease  →")
+        self.new_lease_button.setObjectName("primary")
+        self.new_lease_button.clicked.connect(lambda: self.on_new_lease())
+        self.new_lease_button.setVisible(False)
+        center.addSpacing(4)
+        center.addWidget(self.new_lease_button, alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
+
         center.addStretch()
 
     def _default_out_dir(self) -> Path:
@@ -129,3 +139,4 @@ class ExportScreen(QtWidgets.QWidget):
         self.do_export()
         self.result_label.setText(f"✓ Exported 2 files to {self.out_dir}")
         self.result_label.setVisible(True)
+        self.new_lease_button.setVisible(True)

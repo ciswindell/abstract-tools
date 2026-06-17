@@ -23,8 +23,11 @@ def _repolish(widget: QtWidgets.QWidget) -> None:
     widget.style().polish(widget)
 
 
+_DOT = {"first": "dotFirst", "cont": "dotCont", "none": "dotNone"}
+
+
 class _PageRow(QtWidgets.QFrame):
-    """A clickable page entry in the rail."""
+    """A clickable page entry in the rail, with a classification dot."""
 
     def __init__(self, global_index: int, page_no: int, source: str, on_click):
         super().__init__()
@@ -33,18 +36,26 @@ class _PageRow(QtWidgets.QFrame):
         self.setObjectName("pageRow")
         self.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
         row = QtWidgets.QHBoxLayout(self)
-        row.setContentsMargins(22, 6, 10, 6)
-        row.setSpacing(12)
+        row.setContentsMargins(12, 6, 10, 6)
+        row.setSpacing(10)
+        self.dot = QtWidgets.QFrame()
+        self.dot.setObjectName("dotNone")
+        self.dot.setFixedSize(8, 8)
         self.label = QtWidgets.QLabel(f"Page {page_no}")
         self.label.setObjectName("pageLabel")
         self.src = QtWidgets.QLabel(source)
         self.src.setObjectName("pageSrc")
+        row.addWidget(self.dot)
         row.addWidget(self.label)
         row.addWidget(self.src)
         row.addStretch()
 
     def mousePressEvent(self, event):  # noqa: N802 (Qt override)
         self._on_click(self.global_index)
+
+    def set_dot(self, state: str) -> None:
+        self.dot.setObjectName(_DOT[state])
+        _repolish(self.dot)
 
     def set_current(self, current: bool) -> None:
         self.setObjectName("pageRowCur" if current else "pageRow")
@@ -68,6 +79,7 @@ class SegmentationScreen(QtWidgets.QWidget):
         self._zoom = None  # explicit zoom factor, or None when a fit mode is active
         self._fit = "width"  # "width" | "page" | None
         self._reviewed: set[int] = set()
+        self._classified: set[int] = set()  # pages the user explicitly marked
         self._page_rows: dict[int, _PageRow] = {}
 
         outer = QtWidgets.QVBoxLayout(self)
@@ -104,11 +116,21 @@ class SegmentationScreen(QtWidgets.QWidget):
         self._rail_layout = QtWidgets.QVBoxLayout(self._rail_inner)
         self._rail_layout.setContentsMargins(10, 14, 10, 14)
         self._rail_layout.setSpacing(2)
-        title = QtWidgets.QLabel("DOCUMENTS")
+        title = QtWidgets.QLabel("PAGES")
         title.setObjectName("railTitle")
         self._rail_layout.addWidget(title)
         scroll.setWidget(self._rail_inner)
         return scroll
+
+    def _dot_state(self, global_index: int) -> str:
+        # A source PDF's first page is already classified (a new file is at
+        # minimum a new document), so it shows a dot from the start. Interior
+        # pages stay dot-less until the user reviews/classifies them.
+        page = self.model.pages[global_index]
+        auto_classified = page.source_page_index == 0
+        if global_index not in self._classified and not auto_classified:
+            return "none"
+        return "first" if self.model.is_first_page(global_index) else "cont"
 
     def refresh_list(self) -> None:
         # Clear all rows except the title (index 0).
@@ -119,18 +141,21 @@ class SegmentationScreen(QtWidgets.QWidget):
                 w.deleteLater()
         self._page_rows = {}
 
-        doc_no = 0
+        prev_source = None
         for page in self.model.pages:
             gi = page.global_index
-            if self.model.is_first_page(gi):
-                doc_no += 1
-                head = QtWidgets.QLabel(f"●  DOC {doc_no} · {page.source.file_number}")
-                head.setObjectName("docHead")
-                head.setContentsMargins(6, 8, 6, 2)
-                self._rail_layout.addWidget(head)
-            row = _PageRow(gi, gi + 1, page.source.file_number, self.select_page)
+            source = page.source.file_number
+            # Hairline where the source PDF changes.
+            if prev_source is not None and source != prev_source:
+                sep = QtWidgets.QFrame()
+                sep.setObjectName("railSep")
+                sep.setFixedHeight(2)
+                self._rail_layout.addWidget(sep)
+            row = _PageRow(gi, gi + 1, source, self.select_page)
+            row.set_dot(self._dot_state(gi))
             self._rail_layout.addWidget(row)
             self._page_rows[gi] = row
+            prev_source = source
         self._rail_layout.addStretch()
         # Re-apply current highlight after a rebuild.
         if self.selected_index in self._page_rows:
@@ -261,11 +286,15 @@ class SegmentationScreen(QtWidgets.QWidget):
         self._update_header()
         self._render()
 
+    def _is_source_start(self, global_index: int) -> bool:
+        return self.model.pages[global_index].source_page_index == 0
+
     def _update_buttons(self) -> None:
         is_first = self.model.is_first_page(self.selected_index)
         self.first_button.setProperty("active", "true" if is_first else "false")
         self.continuation_button.setProperty("active", "false" if is_first else "true")
-        self.continuation_button.setEnabled(self.selected_index != 0)
+        # The first page of a source file can never become a continuation.
+        self.continuation_button.setEnabled(not self._is_source_start(self.selected_index))
         _repolish(self.first_button)
         _repolish(self.continuation_button)
 
@@ -277,16 +306,29 @@ class SegmentationScreen(QtWidgets.QWidget):
         )
 
     def mark_first_page(self) -> None:
+        self._classified.add(self.selected_index)
         self.model.set_first_page(self.selected_index)
         self.refresh_list()
         self._advance()
 
     def mark_continuation(self) -> None:
-        if self.selected_index == 0:
+        if self._is_source_start(self.selected_index):
+            self._warn_source_start()
             return
+        self._classified.add(self.selected_index)
         self.model.set_continuation(self.selected_index)
         self.refresh_list()
         self._advance()
+
+    def _warn_source_start(self) -> None:
+        box = QtWidgets.QMessageBox(self)
+        box.setIcon(QtWidgets.QMessageBox.Icon.Warning)
+        box.setWindowTitle("Can't change this page")
+        box.setText(
+            "This is the first page of a source file, so it cannot be "
+            "classified as a continuation page."
+        )
+        box.open()  # non-blocking modal
 
     def _advance(self) -> None:
         # Auto-advance to the very next page (never skips classified pages).

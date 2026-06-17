@@ -25,7 +25,7 @@ class Header(QtWidgets.QWidget):
         if lease:
             brand.setText(f'Lease&nbsp;<span style="color:{theme.PINE}">{lease}</span>')
         else:
-            brand.setText("AA State Abstract Tool")
+            brand.setText("Abstract Tools")
         layout.addWidget(brand)
 
         for i, label in enumerate(_STEPS, start=1):

@@ -48,8 +48,12 @@ class SegmentationModel:
         self._is_first[global_index] = True
 
     def set_continuation(self, global_index: int) -> None:
-        if global_index == 0:
-            raise ValueError("The first page cannot be a continuation page")
+        # A source PDF's first page is always a document start: otherwise that
+        # source file would have no document referencing it as a Source.
+        if self.pages[global_index].source_page_index == 0:
+            raise ValueError(
+                "The first page of a source file must stay a first page"
+            )
         self._is_first[global_index] = False
 
     def documents(self) -> list[Document]:

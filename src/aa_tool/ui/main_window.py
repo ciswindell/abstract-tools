@@ -13,7 +13,7 @@ from aa_tool.ui.segmentation_screen import SegmentationScreen
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("AA State Abstract Tool")
+        self.setWindowTitle("Abstract Tools")
         self.resize(1200, 820)
 
         self.stack = QtWidgets.QStackedWidget()
@@ -86,7 +86,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _show_export_screen(self) -> None:
         screen = ExportScreen(
-            self.ingest_result, self.model, on_back=self._back_to_segmentation
+            self.ingest_result,
+            self.model,
+            on_back=self._back_to_segmentation,
+            on_new_lease=self.start_over,
         )
         self._swap_in(screen, self._export_screen)
         self._export_screen = screen
@@ -94,6 +97,18 @@ class MainWindow(QtWidgets.QMainWindow):
     def _back_to_segmentation(self) -> None:
         if self._segmentation_screen is not None:
             self.stack.setCurrentWidget(self._segmentation_screen)
+
+    def start_over(self) -> None:
+        """Return to the folder picker and drop the current lease's state."""
+        self.stack.setCurrentIndex(self.folder_index)
+        for attr in ("_segmentation_screen", "_export_screen"):
+            screen = getattr(self, attr)
+            if screen is not None:
+                self.stack.removeWidget(screen)
+                screen.deleteLater()
+                setattr(self, attr, None)
+        self.ingest_result = None
+        self.model = None
 
 
 def main() -> None:
