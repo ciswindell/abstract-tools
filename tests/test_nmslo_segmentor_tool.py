@@ -17,7 +17,7 @@ def test_load_lease_builds_model(qtbot, make_pdf, tmp_path):
     assert len(tool.model.pages) == 2
 
 
-def test_back_to_tools_callback_wired(qtbot, make_pdf, tmp_path):
+def test_back_to_tools_callback_wired(qtbot):
     called = []
     from PySide6 import QtWidgets
 

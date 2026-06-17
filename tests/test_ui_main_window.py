@@ -13,7 +13,7 @@ def test_starts_on_board_then_launches_and_returns(qtbot):
     assert window.stack.currentWidget() is window.board
 
     window.launch_tool("nmslo_segmentor")
-    assert window.stack.currentWidget() is not window.board
+    assert window.stack.currentWidget() is window._current_tool
 
     window.show_board()
     assert window.stack.currentWidget() is window.board

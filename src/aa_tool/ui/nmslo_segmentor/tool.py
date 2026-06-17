@@ -72,7 +72,7 @@ class NmsloSegmentorTool(QtWidgets.QWidget):
         if folder:
             self.load_lease(Path(folder))
 
-    def _swap_in(self, screen, previous):
+    def _swap_in(self, screen: QtWidgets.QWidget, previous: QtWidgets.QWidget | None) -> None:
         if previous is not None:
             self.stack.removeWidget(previous)
             previous.deleteLater()

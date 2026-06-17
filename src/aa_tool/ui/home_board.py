@@ -36,7 +36,8 @@ class _ToolCard(QtWidgets.QFrame):
         v.addStretch()
 
     def mousePressEvent(self, event):  # noqa: N802 (Qt override)
-        self._on_launch(self._tool_id)
+        if event is None or event.button() == QtCore.Qt.MouseButton.LeftButton:
+            self._on_launch(self._tool_id)
 
 
 class HomeBoard(QtWidgets.QWidget):
