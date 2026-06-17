@@ -1,0 +1,17 @@
+# Brainstorming visual companion scratch files
+.superpowers/
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+
+# PyInstaller build output
+build/
+dist/
+*.spec
+
+# Office lock files
+.~lock.*#
+~$*
