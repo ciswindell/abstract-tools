@@ -4,6 +4,7 @@ from PySide6 import QtCore, QtWidgets
 
 from aa_tool.ingest import scan_lease_folder
 from aa_tool.model import SegmentationModel
+from aa_tool.ui.export_screen import ExportScreen
 from aa_tool.ui.segmentation_screen import SegmentationScreen
 
 
@@ -47,7 +48,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.stack.setCurrentIndex(self.segmentation_index)
 
     def _show_export_screen(self) -> None:
-        pass  # replaced in Task 11
+        screen = ExportScreen(
+            self.ingest_result, self.model, on_back=self._back_to_segmentation
+        )
+        self.export_index = self.stack.addWidget(screen)
+        self.stack.setCurrentIndex(self.export_index)
+
+    def _back_to_segmentation(self) -> None:
+        self.stack.setCurrentIndex(self.segmentation_index)
 
 
 def main() -> None:
