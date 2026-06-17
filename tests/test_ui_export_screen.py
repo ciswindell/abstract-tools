@@ -17,7 +17,10 @@ def test_export_screen_summary_and_export(qtbot, make_pdf, tmp_path):
 
     screen = ExportScreen(result, model, on_back=lambda: None)
     qtbot.addWidget(screen)
-    assert "2 documents" in screen.summary_label.text()
+    summary_text = screen.summary_label.text()
+    assert "2 source files merged" in summary_text
+    assert "4 pages" in summary_text
+    assert "2 segmented documents" in summary_text
 
     screen.out_dir = tmp_path / "out"
     (tmp_path / "out").mkdir()

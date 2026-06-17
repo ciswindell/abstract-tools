@@ -8,6 +8,7 @@ a = Analysis(
     # matching the layout resource_path() expects under sys._MEIPASS.
     datas=[
         ("src/aa_tool/resources/Template File Documents.xlsx", "aa_tool/resources"),
+        ("src/aa_tool/resources/fonts/*.ttf", "aa_tool/resources/fonts"),
     ],
     hiddenimports=[],
     hookspath=[],

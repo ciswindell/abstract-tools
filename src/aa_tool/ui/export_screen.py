@@ -1,11 +1,12 @@
 from collections.abc import Callable
 from pathlib import Path
 
-from PySide6 import QtWidgets
+from PySide6 import QtCore, QtWidgets
 
 from aa_tool.export import ExportSummary, build_summary, run_export
 from aa_tool.ingest import IngestResult
 from aa_tool.model import SegmentationModel
+from aa_tool.ui.header import Header
 
 
 class ExportScreen(QtWidgets.QWidget):
@@ -16,41 +17,94 @@ class ExportScreen(QtWidgets.QWidget):
         on_back: Callable[[], None],
     ):
         super().__init__()
+        self.setObjectName("screen")
         self.ingest_result = ingest_result
         self.model = model
         self.on_back = on_back
         self.out_dir = self._default_out_dir()
 
-        layout = QtWidgets.QVBoxLayout(self)
+        outer = QtWidgets.QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        outer.addWidget(Header(active_step=3, lease=ingest_result.lease_number))
 
         documents = self.model.documents()
-        doc_count, page_count, source_count, assignments = build_summary(
+        doc_count, page_count, source_count, _assignments = build_summary(
             ingest_result, documents
         )
+
+        # Centered hero, mirroring the Open screen: everything tight in the middle.
+        center = QtWidgets.QVBoxLayout()
+        center.setContentsMargins(48, 0, 48, 0)
+        center.setSpacing(16)
+        center.addStretch()
+        outer.addLayout(center, 1)
+
+        title = QtWidgets.QLabel("Ready to export")
+        title.setObjectName("h1")
+        title.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        center.addWidget(title)
+
         self.summary_label = QtWidgets.QLabel(
-            f"{doc_count} documents · {page_count} pages merged · "
-            f"{source_count} source files · assignments {', '.join(assignments)}"
+            f"{source_count} source files merged\n"
+            f"{page_count} pages\n"
+            f"{doc_count} segmented documents"
         )
-        layout.addWidget(self.summary_label)
+        self.summary_label.setObjectName("sub")
+        self.summary_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        center.addWidget(self.summary_label)
 
-        skipped = ingest_result.skipped
-        if skipped:
+        if ingest_result.skipped:
             warn = QtWidgets.QLabel(
-                "Skipped files: " + ", ".join(p.name for p, _ in skipped)
+                "Skipped files: " + ", ".join(p.name for p, _ in ingest_result.skipped)
             )
-            warn.setStyleSheet("color: #7a5c00;")
-            layout.addWidget(warn)
+            warn.setObjectName("warn")
+            warn.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+            center.addWidget(warn)
 
-        button_bar = QtWidgets.QHBoxLayout()
-        self.back_button = QtWidgets.QPushButton("◀ Back to segmenting")
+        center.addSpacing(10)
+
+        # Destination is shown explicitly (defaults to the lease folder) so the
+        # user always sees where files will go — no surprise from a dialog.
+        dest = QtWidgets.QHBoxLayout()
+        dest.setSpacing(10)
+        self.path_label = QtWidgets.QLabel(str(self.out_dir))
+        self.path_label.setObjectName("savePath")
+        change_button = QtWidgets.QPushButton("Change…")
+        change_button.setObjectName("ghost")
+        change_button.clicked.connect(self._change_folder)
+        dest.addStretch()
+        dest.addWidget(QtWidgets.QLabel("Save to:"))
+        dest.addWidget(self.path_label)
+        dest.addWidget(change_button)
+        dest.addStretch()
+        center.addLayout(dest)
+
+        center.addSpacing(10)
+        buttons = QtWidgets.QHBoxLayout()
+        buttons.setSpacing(12)
+        self.back_button = QtWidgets.QPushButton("←  Back to segmenting")
+        self.back_button.setObjectName("ghost")
         self.back_button.clicked.connect(lambda: self.on_back())
-        self.export_button = QtWidgets.QPushButton("Export PDF + Excel ▶")
+        self.export_button = QtWidgets.QPushButton("Export PDF + Excel  →")
+        self.export_button.setObjectName("primary")
         self.export_button.clicked.connect(self._on_export_clicked)
-        button_bar.addWidget(self.back_button)
-        button_bar.addStretch()
-        button_bar.addWidget(self.export_button)
-        layout.addStretch()
-        layout.addLayout(button_bar)
+        buttons.addStretch()
+        buttons.addWidget(self.back_button)
+        buttons.addWidget(self.export_button)
+        buttons.addStretch()
+        center.addLayout(buttons)
+
+        # Inline, on-theme result shown after a successful export (replaces the
+        # old unreadable popup). Hidden until Export runs.
+        self.result_label = QtWidgets.QLabel()
+        self.result_label.setObjectName("success")
+        self.result_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.result_label.setVisible(False)
+        center.addSpacing(6)
+        center.addWidget(self.result_label)
+
+        center.addStretch()
 
     def _default_out_dir(self) -> Path:
         if self.ingest_result.sources:
@@ -62,10 +116,16 @@ class ExportScreen(QtWidgets.QWidget):
         documents = self.model.documents()
         return run_export(self.ingest_result, documents, self.out_dir)
 
+    def _change_folder(self) -> None:
+        chosen = QtWidgets.QFileDialog.getExistingDirectory(
+            self, "Choose output folder", str(self.out_dir)
+        )
+        if chosen:
+            self.out_dir = Path(chosen)
+            self.path_label.setText(str(self.out_dir))
+
     def _on_export_clicked(self) -> None:
-        chosen = QtWidgets.QFileDialog.getExistingDirectory(self, "Choose output folder", str(self.out_dir))
-        if not chosen:
-            return
-        self.out_dir = Path(chosen)
-        summary = self.do_export()
-        QtWidgets.QMessageBox.information(self, "Export complete", f"Saved:\n{summary.pdf_path.name}\n{summary.xlsx_path.name}")
+        # Saves to the destination shown on screen — no surprise dialog.
+        self.do_export()
+        self.result_label.setText(f"✓ Exported 2 files to {self.out_dir}")
+        self.result_label.setVisible(True)
