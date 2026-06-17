@@ -155,6 +155,19 @@ QLabel#savePath {{
     font-family: "{MONO}"; font-size: 12px; color: {INK_SOFT};
     background: {CARD}; border: 1px solid {LINE}; border-radius: 8px; padding: 10px 12px;
 }}
+
+/* ---- Home board ---- */
+QWidget#boardTop {{ background: {CARD}; border-bottom: 1px solid {LINE}; }}
+QLabel#boardBrand {{ font-family: "{SANS}"; font-size: 19px; font-weight: 800; letter-spacing: -0.3px; }}
+QLabel#boardHero {{ font-family: "{SANS}"; font-size: 34px; font-weight: 800; letter-spacing: -0.8px; }}
+QLabel#boardHeroSub {{ font-size: 15px; color: {INK_SOFT}; }}
+QLabel#secHead {{ font-size: 13px; font-weight: 700; color: {INK_SOFT}; }}
+QFrame#secRule {{ background: {LINE}; max-height: 1px; min-height: 1px; }}
+QFrame#toolCard {{ background: {CARD}; border: 1px solid {LINE}; border-radius: 14px; }}
+QFrame#toolCard:hover {{ border-color: {PINE}; }}
+QLabel#toolCardName {{ font-size: 16px; font-weight: 700; }}
+QLabel#toolCardDesc {{ font-size: 13px; color: {INK_SOFT}; }}
+QLabel#toolCardIcon {{ background: #e7efe9; border-radius: 11px; }}
 """
 
 
