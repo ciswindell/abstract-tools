@@ -31,3 +31,35 @@ def test_scan_skips_non_pdf_and_unreadable(make_pdf, tmp_path):
     assert [s.file_number for s in result.sources] == ["368481"]
     skipped_names = sorted(p.name for p, _ in result.skipped)
     assert skipped_names == ["broken.pdf", "notes.txt"]
+
+
+def test_scan_orders_numeric_before_nonnumeric_alphabetical(make_pdf, tmp_path):
+    lease = tmp_path / "B11294"
+    # Numeric subfolders out of natural order, plus non-numeric names with
+    # mixed case to exercise the case-insensitive alphabetical fallback.
+    make_pdf("100.pdf", 1, parent=lease / "10")
+    make_pdf("200.pdf", 1, parent=lease / "0")
+    make_pdf("alpha.pdf", 1, parent=lease / "alpha")
+    make_pdf("beta.pdf", 1, parent=lease / "Beta")
+
+    result = scan_lease_folder(lease)
+
+    # All-numeric subfolders first in numeric order (0 before 10, not string
+    # order), then non-numeric in case-insensitive alphabetical order
+    # (alpha before Beta).
+    assert [s.assignment for s in result.sources] == ["0", "10", "alpha", "Beta"]
+
+
+def test_scan_orders_file_stems_numeric_before_nonnumeric(make_pdf, tmp_path):
+    lease = tmp_path / "B11294"
+    sub = lease / "0"
+    make_pdf("100.pdf", 1, parent=sub)
+    make_pdf("9.pdf", 1, parent=sub)
+    make_pdf("apple.pdf", 1, parent=sub)
+    make_pdf("Banana.pdf", 1, parent=sub)
+
+    result = scan_lease_folder(lease)
+
+    # Numeric stems first in numeric order (9 before 100), then non-numeric
+    # in case-insensitive alphabetical order (apple before Banana).
+    assert [s.file_number for s in result.sources] == ["9", "100", "apple", "Banana"]
