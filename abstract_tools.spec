@@ -4,12 +4,12 @@ a = Analysis(
     ["main.py"],
     pathex=["src"],
     binaries=[],
-    # Bundle the Excel template into aa_tool/resources/ inside the one-file build,
+    # Bundle the Excel template into abstract_tools/resources/ inside the one-file build,
     # matching the layout resource_path() expects under sys._MEIPASS.
     datas=[
-        ("src/aa_tool/resources/Template File Documents.xlsx", "aa_tool/resources"),
-        ("src/aa_tool/resources/fonts/*.ttf", "aa_tool/resources/fonts"),
-        ("src/aa_tool/resources/icons/*.svg", "aa_tool/resources/icons"),
+        ("src/abstract_tools/resources/Template File Documents.xlsx", "abstract_tools/resources"),
+        ("src/abstract_tools/resources/fonts/*.ttf", "abstract_tools/resources/fonts"),
+        ("src/abstract_tools/resources/icons/*.svg", "abstract_tools/resources/icons"),
     ],
     # Pillow loads its format handlers dynamically, so PyInstaller's static
     # scan can miss them. The Batch TIFF→PDF Converter needs the TIFF reader,

@@ -1,6 +1,6 @@
 from datetime import date
 
-from aa_tool.labels import build_bookmark_label
+from abstract_tools.labels import build_bookmark_label
 
 
 def test_label_with_blank_date_renders_na():

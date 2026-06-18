@@ -2,9 +2,9 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from aa_tool.ingest import SourcePdf
-from aa_tool.model import SegmentationModel
-from aa_tool.ui.nmslo_segmentor.segmentation_screen import SegmentationScreen
+from abstract_tools.ingest import SourcePdf
+from abstract_tools.model import SegmentationModel
+from abstract_tools.ui.nmslo_segmentor.segmentation_screen import SegmentationScreen
 
 
 def _model(make_pdf):

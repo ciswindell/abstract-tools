@@ -3,8 +3,8 @@ from pathlib import Path
 
 from PySide6 import QtCore, QtWidgets
 
-from aa_tool.ui.header import Header
-from aa_tool.ui.tiff_converter.plan_screen import CONVERTER_STEPS, PlanScreen
+from abstract_tools.ui.header import Header
+from abstract_tools.ui.tiff_converter.plan_screen import CONVERTER_STEPS, PlanScreen
 
 
 class TiffConverterTool(QtWidgets.QWidget):

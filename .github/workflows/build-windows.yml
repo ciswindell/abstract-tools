@@ -22,7 +22,7 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: python -m pytest -q
       - name: Build executable
-        run: pyinstaller --noconfirm aa_tool.spec
+        run: pyinstaller --noconfirm abstract_tools.spec
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:

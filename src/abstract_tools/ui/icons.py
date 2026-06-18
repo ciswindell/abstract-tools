@@ -1,6 +1,6 @@
 from PySide6 import QtCore, QtGui, QtSvg
 
-from aa_tool.resources import resource_path
+from abstract_tools.resources import resource_path
 
 
 def svg_pixmap(name: str, size: int) -> QtGui.QPixmap:

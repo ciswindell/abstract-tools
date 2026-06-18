@@ -2,8 +2,8 @@ from pathlib import Path
 
 from openpyxl import load_workbook
 
-from aa_tool.model import Document
-from aa_tool.resources import resource_path
+from abstract_tools.model import Document
+from abstract_tools.resources import resource_path
 
 TEMPLATE_NAME = "Template File Documents.xlsx"
 

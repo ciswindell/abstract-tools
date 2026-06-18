@@ -2,9 +2,9 @@ from pathlib import Path
 
 import fitz
 
-from aa_tool.ingest import SourcePdf
-from aa_tool.labels import build_bookmark_label
-from aa_tool.model import Document
+from abstract_tools.ingest import SourcePdf
+from abstract_tools.labels import build_bookmark_label
+from abstract_tools.model import Document
 
 
 def export_pdf(

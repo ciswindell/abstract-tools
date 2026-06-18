@@ -1,4 +1,4 @@
-from aa_tool.render import render_page_png
+from abstract_tools.render import render_page_png
 
 
 def test_render_returns_png_bytes(make_pdf):

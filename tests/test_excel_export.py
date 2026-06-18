@@ -2,9 +2,9 @@ from pathlib import Path
 
 from openpyxl import load_workbook
 
-from aa_tool.ingest import SourcePdf
-from aa_tool.model import Document, MergedPage
-from aa_tool.excel_export import export_excel, COLUMNS
+from abstract_tools.ingest import SourcePdf
+from abstract_tools.model import Document, MergedPage
+from abstract_tools.excel_export import export_excel, COLUMNS
 
 
 def _doc(index, file_number, assignment):

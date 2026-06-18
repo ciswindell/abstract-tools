@@ -3,7 +3,7 @@ from pathlib import Path
 
 from PySide6 import QtCore, QtWidgets
 
-from aa_tool.tiff_convert import (
+from abstract_tools.tiff_convert import (
     PlanSummary,
     RunSummary,
     default_output,
@@ -11,8 +11,8 @@ from aa_tool.tiff_convert import (
     run_conversion,
     summarize_plan,
 )
-from aa_tool.ui import theme
-from aa_tool.ui.header import Header
+from abstract_tools.ui import theme
+from abstract_tools.ui.header import Header
 
 CONVERTER_STEPS = ["1 · Open", "2 · Convert"]
 

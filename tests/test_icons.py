@@ -2,7 +2,7 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from aa_tool.ui.icons import svg_pixmap
+from abstract_tools.ui.icons import svg_pixmap
 
 
 def test_svg_pixmap_renders_square_non_null(qtbot):

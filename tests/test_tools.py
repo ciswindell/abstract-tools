@@ -1,4 +1,4 @@
-from aa_tool.tools import Tool, tools_by_category
+from abstract_tools.tools import Tool, tools_by_category
 
 
 def _tool(id, category):
@@ -18,7 +18,7 @@ def test_groups_by_category_preserving_order():
 
 
 def test_tiff_converter_registered_under_nmslo():
-    from aa_tool.tools import TOOLS
+    from abstract_tools.tools import TOOLS
 
     by_id = {t.id: t for t in TOOLS}
     tool = by_id["tiff_converter"]

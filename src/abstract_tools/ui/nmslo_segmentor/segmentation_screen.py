@@ -9,10 +9,10 @@ from collections.abc import Callable
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
-from aa_tool.model import SegmentationModel
-from aa_tool.render import page_size, render_page_png
-from aa_tool.ui import theme
-from aa_tool.ui.header import Header
+from abstract_tools.model import SegmentationModel
+from abstract_tools.render import page_size, render_page_png
+from abstract_tools.ui import theme
+from abstract_tools.ui.header import Header
 
 _ZOOM_STEP = 1.2
 _MIN_ZOOM = 0.2

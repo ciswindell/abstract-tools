@@ -7,7 +7,7 @@ from pathlib import Path
 from PIL import Image
 from PySide6 import QtWidgets
 
-from aa_tool.ui.tiff_converter.tool import TiffConverterTool
+from abstract_tools.ui.tiff_converter.tool import TiffConverterTool
 
 
 def _make_tiff(path: Path, pages: int = 1) -> Path:
@@ -83,7 +83,7 @@ def test_shutdown_with_no_conversion_is_noop(qtbot):
     # No load_folder called — plan_screen is None; shutdown must not raise.
     tool.shutdown()
     # Also test PlanScreen shutdown with no thread started.
-    from aa_tool.ui.tiff_converter.plan_screen import PlanScreen
+    from abstract_tools.ui.tiff_converter.plan_screen import PlanScreen
     ps = PlanScreen(
         source=__import__("pathlib").Path("."),
         on_back_to_tools=lambda: None,

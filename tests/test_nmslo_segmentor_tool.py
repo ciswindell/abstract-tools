@@ -2,7 +2,7 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from aa_tool.ui.nmslo_segmentor.tool import NmsloSegmentorTool
+from abstract_tools.ui.nmslo_segmentor.tool import NmsloSegmentorTool
 
 
 def test_load_lease_builds_model(qtbot, make_pdf, tmp_path):

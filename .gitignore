@@ -14,7 +14,7 @@ __pycache__/
 build/
 dist/
 *.spec
-!aa_tool.spec
+!abstract_tools.spec
 
 # Office lock files
 .~lock.*#

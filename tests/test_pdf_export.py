@@ -1,8 +1,8 @@
 import fitz
 
-from aa_tool.ingest import scan_lease_folder
-from aa_tool.model import SegmentationModel
-from aa_tool.pdf_export import export_pdf
+from abstract_tools.ingest import scan_lease_folder
+from abstract_tools.model import SegmentationModel
+from abstract_tools.pdf_export import export_pdf
 
 
 def test_export_pdf_merges_and_bookmarks(make_pdf, tmp_path):

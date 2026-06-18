@@ -3,11 +3,11 @@ from pathlib import Path
 
 from PySide6 import QtCore, QtWidgets
 
-from aa_tool.export import ExportSummary, build_summary, run_export
-from aa_tool.ingest import IngestResult
-from aa_tool.model import SegmentationModel
-from aa_tool.ui import theme
-from aa_tool.ui.header import Header
+from abstract_tools.export import ExportSummary, build_summary, run_export
+from abstract_tools.ingest import IngestResult
+from abstract_tools.model import SegmentationModel
+from abstract_tools.ui import theme
+from abstract_tools.ui.header import Header
 
 
 class ExportScreen(QtWidgets.QWidget):

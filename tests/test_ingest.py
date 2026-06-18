@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from aa_tool.ingest import scan_lease_folder
+from abstract_tools.ingest import scan_lease_folder
 
 
 def test_scan_orders_by_assignment_then_file_number(make_pdf, tmp_path):

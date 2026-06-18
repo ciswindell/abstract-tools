@@ -1,8 +1,8 @@
 from PySide6 import QtWidgets
 
-from aa_tool import tools as tools_module
-from aa_tool.ui import theme
-from aa_tool.ui.home_board import HomeBoard
+from abstract_tools import tools as tools_module
+from abstract_tools.ui import theme
+from abstract_tools.ui.home_board import HomeBoard
 
 
 class MainWindow(QtWidgets.QMainWindow):

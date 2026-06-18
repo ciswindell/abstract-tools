@@ -1,4 +1,4 @@
-from aa_tool.resources import resource_path
+from abstract_tools.resources import resource_path
 
 
 def test_resource_path_points_at_bundled_template():

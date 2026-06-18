@@ -6,7 +6,7 @@ type) is shared across every screen so the app reads as one cohesive tool.
 
 from PySide6 import QtGui, QtWidgets
 
-from aa_tool.resources import resource_path
+from abstract_tools.resources import resource_path
 
 # Font family names as registered by their TTFs (used in the stylesheet below).
 # A clean modern grotesque throughout for a contemporary app feel; a mono face

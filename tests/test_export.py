@@ -1,6 +1,6 @@
-from aa_tool.ingest import scan_lease_folder
-from aa_tool.model import SegmentationModel
-from aa_tool.export import run_export
+from abstract_tools.ingest import scan_lease_folder
+from abstract_tools.model import SegmentationModel
+from abstract_tools.export import run_export
 
 
 def test_run_export_writes_named_files_and_summary(make_pdf, tmp_path):

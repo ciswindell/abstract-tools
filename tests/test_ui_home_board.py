@@ -2,8 +2,8 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from aa_tool.tools import Tool
-from aa_tool.ui.home_board import HomeBoard
+from abstract_tools.tools import Tool
+from abstract_tools.ui.home_board import HomeBoard
 
 
 def _tool(id, category):

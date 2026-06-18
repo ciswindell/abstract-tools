@@ -3,11 +3,11 @@ from pathlib import Path
 
 from PySide6 import QtCore, QtWidgets
 
-from aa_tool.ingest import scan_lease_folder
-from aa_tool.model import SegmentationModel
-from aa_tool.ui.header import Header
-from aa_tool.ui.nmslo_segmentor.export_screen import ExportScreen
-from aa_tool.ui.nmslo_segmentor.segmentation_screen import SegmentationScreen
+from abstract_tools.ingest import scan_lease_folder
+from abstract_tools.model import SegmentationModel
+from abstract_tools.ui.header import Header
+from abstract_tools.ui.nmslo_segmentor.export_screen import ExportScreen
+from abstract_tools.ui.nmslo_segmentor.segmentation_screen import SegmentationScreen
 
 
 class NmsloSegmentorTool(QtWidgets.QWidget):

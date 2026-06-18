@@ -1,7 +1,7 @@
 import pytest
 
-from aa_tool.ingest import SourcePdf
-from aa_tool.model import SegmentationModel
+from abstract_tools.ingest import SourcePdf
+from abstract_tools.model import SegmentationModel
 from pathlib import Path
 
 

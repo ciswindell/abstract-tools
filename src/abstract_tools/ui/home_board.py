@@ -2,8 +2,8 @@ from collections.abc import Callable
 
 from PySide6 import QtCore, QtWidgets
 
-from aa_tool.tools import Tool, tools_by_category
-from aa_tool.ui.icons import svg_pixmap
+from abstract_tools.tools import Tool, tools_by_category
+from abstract_tools.ui.icons import svg_pixmap
 
 
 class _ToolCard(QtWidgets.QFrame):

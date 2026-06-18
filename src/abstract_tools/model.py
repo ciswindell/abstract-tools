@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from aa_tool.ingest import SourcePdf
+from abstract_tools.ingest import SourcePdf
 
 
 @dataclass(frozen=True)

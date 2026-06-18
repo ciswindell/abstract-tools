@@ -2,7 +2,7 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from aa_tool.ui.header import Header
+from abstract_tools.ui.header import Header
 
 
 def test_back_to_tools_link_invokes_callback(qtbot):

@@ -22,8 +22,8 @@ def tools_by_category(tools: list[Tool]) -> dict[str, list[Tool]]:
     return grouped
 
 
-from aa_tool.ui.nmslo_segmentor.tool import NmsloSegmentorTool
-from aa_tool.ui.tiff_converter.tool import TiffConverterTool
+from abstract_tools.ui.nmslo_segmentor.tool import NmsloSegmentorTool
+from abstract_tools.ui.tiff_converter.tool import TiffConverterTool
 
 SEGMENTOR_TOOL = Tool(
     id="nmslo_segmentor",

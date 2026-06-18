@@ -2,7 +2,7 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from aa_tool.ui.main_window import MainWindow
+from abstract_tools.ui.main_window import MainWindow
 
 
 def test_starts_on_board_then_launches_and_returns(qtbot):
