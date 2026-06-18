@@ -23,9 +23,10 @@ from abstract_tools.srp.extract import extract_case_actions, read_srp
 from abstract_tools.srp.transform import clean_case_actions
 
 _SRP_SHEET = "SRP"
-# The verbatim "SRP" tab is forced to this point size for readability; the
-# "SRP Case Actions" sheet and the original worksheet sheets are left as-is.
-_SRP_FONT_SIZE = 11
+# On the verbatim "SRP" tab, fonts smaller than this are raised to it for
+# readability; larger fonts are left unchanged. The "SRP Case Actions" sheet
+# and the original worksheet sheets are left as-is.
+_SRP_MIN_FONT_SIZE = 11
 
 
 def _write_case_actions(ws, df: pd.DataFrame) -> None:
@@ -53,11 +54,12 @@ def _write_case_actions(ws, df: pd.DataFrame) -> None:
     ws.freeze_panes = "A2"
 
 
-def _copy_sheet(source, target, *, font_size: int | None = None) -> None:
+def _copy_sheet(source, target, *, min_font_size: int | None = None) -> None:
     """Copy values + formatting from one worksheet to another.
 
-    If font_size is given, every copied cell's font is forced to that point
-    size while its other font attributes (name, bold, colour, …) are preserved.
+    If min_font_size is given, any copied cell whose font is smaller than it is
+    raised to that point size; larger fonts are left unchanged. Other font
+    attributes (name, bold, colour, …) are always preserved.
     """
     for row in source.iter_rows():
         for cell in row:
@@ -72,10 +74,12 @@ def _copy_sheet(source, target, *, font_size: int | None = None) -> None:
                 tgt.number_format = cell.number_format
                 tgt.protection = copy(cell.protection)
                 tgt.alignment = copy(cell.alignment)
-            if font_size is not None:
-                resized = copy(cell.font)
-                resized.size = font_size
-                tgt.font = resized
+            if min_font_size is not None:
+                current = cell.font.size or min_font_size
+                if current < min_font_size:
+                    resized = copy(cell.font)
+                    resized.size = min_font_size
+                    tgt.font = resized
 
     for merged in source.merged_cells.ranges:
         target.merge_cells(str(merged))
@@ -99,7 +103,11 @@ def run_srp_merge(srp_path: Path, worksheet_path: Path) -> None:
     _write_case_actions(workbook.create_sheet(SHEET_NAME), case_actions)
 
     srp_source = load_workbook(srp_path, data_only=False).active
-    _copy_sheet(srp_source, workbook.create_sheet(_SRP_SHEET), font_size=_SRP_FONT_SIZE)
+    _copy_sheet(
+        srp_source,
+        workbook.create_sheet(_SRP_SHEET),
+        min_font_size=_SRP_MIN_FONT_SIZE,
+    )
 
     fd, tmp_name = tempfile.mkstemp(suffix=".xlsx", dir=worksheet_path.parent)
     os.close(fd)

@@ -63,43 +63,47 @@ def test_rerun_overwrites_without_duplicating_sheets(tmp_path):
     assert wb.sheetnames == ["Abstract", "SRP Case Actions", "SRP"]
 
 
-def test_srp_tab_font_forced_to_size_11(tmp_path):
+def test_srp_tab_font_raised_to_minimum_11(tmp_path):
     from openpyxl.styles import Font
 
-    # SRP source: a title cell at size 14 bold, plus the CASE ACTIONS table.
+    # SRP source: a 14pt title (already large), a 9pt note (too small),
+    # then the CASE ACTIONS table (default font).
     srp = tmp_path / "srp.xlsx"
     wb = Workbook()
     ws = wb.active
-    ws["A1"] = "Serial Register Page"
+    ws["A1"] = "Big Title"
     ws["A1"].font = Font(name="Arial", size=14, bold=True)
+    ws["A2"] = "Tiny note"
+    ws["A2"].font = Font(size=9)
     ws.append(["CASE ACTIONS"])
     ws.append(["Action Date", "Date Filed", "Action Name", "Action Status",
                "Action Information"])
     ws.append(["2020-01-05", "2020-01-01", "Lease Issued", "Active", "Info A"])
     wb.save(srp)
 
-    # Original worksheet: a cell at size 16 that must NOT be touched.
+    # Original worksheet: a 9pt cell that must NOT be raised (not the SRP tab).
     worksheet = tmp_path / "abstract.xlsx"
     awb = Workbook()
     aws = awb.active
     aws.title = "Abstract"
     aws["A1"] = "KEEP ME"
-    aws["A1"].font = Font(size=16)
+    aws["A1"].font = Font(size=9)
     awb.save(worksheet)
 
     run_srp_merge(srp, worksheet)
 
     out = load_workbook(worksheet)
     srp_ws = out["SRP"]
-    # Every populated cell on the SRP tab is size 11.
-    sizes = {c.font.size for row in srp_ws.iter_rows() for c in row
-             if c.value is not None}
-    assert sizes == {11.0}
-    # Other font attributes are preserved (the title stays Arial bold).
+    # Larger-than-11 size is left as-is, with other attributes preserved.
+    assert srp_ws["A1"].font.size == 14.0
     assert srp_ws["A1"].font.bold is True
     assert srp_ws["A1"].font.name == "Arial"
-    # The original worksheet sheet is left untouched.
-    assert out["Abstract"]["A1"].font.size == 16.0
+    # Smaller-than-11 size is raised to the 11 floor.
+    assert srp_ws["A2"].font.size == 11.0
+    # Default-font cells (the table) stay at 11.
+    assert srp_ws["A3"].font.size == 11.0
+    # The original worksheet sheet is left untouched (9pt stays 9pt).
+    assert out["Abstract"]["A1"].font.size == 9.0
 
 
 def test_failed_replace_leaves_original_intact(tmp_path, monkeypatch):
