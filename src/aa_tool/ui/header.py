@@ -16,6 +16,7 @@ class Header(QtWidgets.QWidget):
         context_html: str = "",
         on_back_to_tools: Callable[[], None] | None = None,
         lease: str | None = None,
+        steps: list[str] | None = None,
     ):
         super().__init__()
         self.setObjectName("header")
@@ -46,7 +47,8 @@ class Header(QtWidgets.QWidget):
             brand.setText("Abstract Tools")
         layout.addWidget(brand)
 
-        for i, label in enumerate(_STEPS, start=1):
+        step_labels = steps if steps is not None else _STEPS
+        for i, label in enumerate(step_labels, start=1):
             chip = QtWidgets.QLabel(label)
             chip.setObjectName("stepActive" if i == active_step else "step")
             layout.addWidget(chip)
