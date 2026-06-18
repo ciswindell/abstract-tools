@@ -23,7 +23,6 @@ def _format_size(num_bytes: int) -> str:
         if size < 1024 or unit == "TB":
             return f"{int(size)} B" if unit == "B" else f"{size:.1f} {unit}"
         size /= 1024
-    return f"{size:.1f} PB"
 
 
 class ConversionWorker(QtCore.QObject):
@@ -171,7 +170,14 @@ class PlanScreen(QtWidgets.QWidget):
             standardize=self.standardize_checkbox.isChecked(),
         )
 
+    @QtCore.Slot()
+    def _clear_thread_refs(self) -> None:
+        self._thread = None
+        self._worker = None
+
     def _on_convert_clicked(self) -> None:
+        if self._thread is not None and self._thread.isRunning():
+            return
         self.convert_button.setEnabled(False)
         self.result_label.setVisible(False)
         self.failures_label.setVisible(False)
@@ -185,6 +191,9 @@ class PlanScreen(QtWidgets.QWidget):
         self._worker.progress.connect(self._on_progress)
         self._worker.finished.connect(self._on_finished)
         self._worker.finished.connect(self._thread.quit)
+        self._thread.finished.connect(self._worker.deleteLater)
+        self._thread.finished.connect(self._thread.deleteLater)
+        self._thread.finished.connect(self._clear_thread_refs)
         self._thread.start()
 
     @QtCore.Slot(int, int, str)
