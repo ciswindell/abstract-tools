@@ -88,12 +88,21 @@ class MainWindow(QtWidgets.QMainWindow):
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
         worker.found.connect(self._on_update_found)
+        # Clear the Python refs before thread.quit so we never hold a stale
+        # wrapper once deleteLater fires; done fires from the worker thread
+        # and is delivered to the main thread via the queued connection.
+        worker.done.connect(self._clear_check_thread)
         worker.done.connect(thread.quit)
         thread.finished.connect(worker.deleteLater)
         thread.finished.connect(thread.deleteLater)
         self._check_thread = thread
         self._check_worker = worker
         thread.start()
+
+    @QtCore.Slot()
+    def _clear_check_thread(self) -> None:
+        self._check_thread = None
+        self._check_worker = None
 
     @QtCore.Slot(object)
     def _on_update_found(self, info: UpdateInfo) -> None:
@@ -108,6 +117,9 @@ class MainWindow(QtWidgets.QMainWindow):
         thread.started.connect(worker.run)
         worker.done.connect(self._on_download_done)
         worker.failed.connect(self._on_download_failed)
+        # Clear the Python refs before thread.quit (same stale-wrapper guard).
+        worker.done.connect(self._clear_download_thread)
+        worker.failed.connect(self._clear_download_thread)
         worker.done.connect(thread.quit)
         worker.failed.connect(thread.quit)
         thread.finished.connect(worker.deleteLater)
@@ -115,6 +127,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self._download_thread = thread
         self._download_worker = worker
         thread.start()
+
+    @QtCore.Slot()
+    def _clear_download_thread(self) -> None:
+        self._download_thread = None
+        self._download_worker = None
 
     @QtCore.Slot(object)
     def _on_download_done(self, saved: Path) -> None:
@@ -133,6 +150,23 @@ class MainWindow(QtWidgets.QMainWindow):
             update_check.downloads_dir(),
             f"Abstract Tools {info.latest_version}.exe",
         )
+
+    # --- window lifecycle ---------------------------------------------
+    def closeEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        """Wait for any in-flight background threads before closing.
+
+        Destroying a running QThread crashes Qt, so we quit+wait.
+        The _clear_*_thread slots zero out the refs when threads finish
+        naturally, so by the time closeEvent fires the refs are either
+        None (thread already done) or a live QThread that needs waiting.
+        No try/except gymnastics needed — the stale-wrapper race is
+        eliminated by clearing the ref in finished-connected slots.
+        """
+        for thread in (self._check_thread, self._download_thread):
+            if thread is not None and thread.isRunning():
+                thread.quit()
+                thread.wait()
+        super().closeEvent(event)
 
     # --- tool switching (unchanged behaviour) -------------------------
     def launch_tool(self, tool_id: str) -> None:
