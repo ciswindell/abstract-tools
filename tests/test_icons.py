@@ -16,3 +16,9 @@ def test_tiff_converter_icon_renders(qtbot):
     pm = svg_pixmap("icons/tiff_converter.svg", 48)
     assert not pm.isNull()
     assert pm.width() == 48
+
+
+def test_srp_parser_icon_renders(qtbot):
+    pm = svg_pixmap("icons/srp_parser.svg", 48)
+    assert not pm.isNull()
+    assert pm.width() == 48

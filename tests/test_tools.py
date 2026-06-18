@@ -25,3 +25,13 @@ def test_tiff_converter_registered_under_nmslo():
     assert tool.name == "Batch TIFF to PDF Converter"
     assert tool.category == "NM State Land Office"
     assert tool.icon == "icons/tiff_converter.svg"
+
+
+def test_srp_parser_registered_under_blm():
+    from abstract_tools.tools import TOOLS
+
+    by_id = {t.id: t for t in TOOLS}
+    tool = by_id["srp_parser"]
+    assert tool.name == "SRP Parser"
+    assert tool.category == "Bureau of Land Management"
+    assert tool.icon == "icons/srp_parser.svg"

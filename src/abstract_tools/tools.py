@@ -24,6 +24,7 @@ def tools_by_category(tools: list[Tool]) -> dict[str, list[Tool]]:
 
 from abstract_tools.ui.nmslo_segmentor.tool import NmsloSegmentorTool
 from abstract_tools.ui.tiff_converter.tool import TiffConverterTool
+from abstract_tools.ui.srp_parser.tool import SrpParserTool
 
 SEGMENTOR_TOOL = Tool(
     id="nmslo_segmentor",
@@ -49,4 +50,16 @@ TIFF_CONVERTER_TOOL = Tool(
     build=lambda on_back: TiffConverterTool(on_back),
 )
 
-TOOLS: list[Tool] = [SEGMENTOR_TOOL, TIFF_CONVERTER_TOOL]
+SRP_PARSER_TOOL = Tool(
+    id="srp_parser",
+    name="SRP Parser",
+    description=(
+        "Read a BLM Serial Register Page export and add a cleaned Case Actions "
+        "sheet plus a verbatim SRP copy to a Worksheet."
+    ),
+    category="Bureau of Land Management",
+    icon="icons/srp_parser.svg",
+    build=lambda on_back: SrpParserTool(on_back),
+)
+
+TOOLS: list[Tool] = [SEGMENTOR_TOOL, TIFF_CONVERTER_TOOL, SRP_PARSER_TOOL]
