@@ -28,6 +28,24 @@ class _CheckWorker(QtCore.QObject):
         self.done.emit()
 
 
+class _DownloadWorker(QtCore.QObject):
+    done = QtCore.Signal(object)  # Path
+    failed = QtCore.Signal()
+
+    def __init__(self, downloader: Callable[[UpdateInfo], Path], info: UpdateInfo):
+        super().__init__()
+        self._downloader = downloader
+        self._info = info
+
+    @QtCore.Slot()
+    def run(self) -> None:
+        try:
+            saved = self._downloader(self._info)
+            self.done.emit(saved)
+        except Exception:
+            self.failed.emit()
+
+
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(
         self,
@@ -60,6 +78,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self._check_thread: QtCore.QThread | None = None
         self._check_worker: _CheckWorker | None = None
+        self._download_thread: QtCore.QThread | None = None
+        self._download_worker: _DownloadWorker | None = None
 
     # --- update check -------------------------------------------------
     def start_update_check(self) -> None:
@@ -82,19 +102,27 @@ class MainWindow(QtWidgets.QMainWindow):
     def _on_download_requested(self, info: UpdateInfo) -> None:
         self.banner.download_button.setEnabled(False)
         self.banner.set_status(f"Downloading version {info.latest_version}…")
-        QtWidgets.QApplication.processEvents()
-        try:
-            saved = self._downloader(info)
-        except Exception:
-            self._on_download_failed()
-            return
-        self._on_download_done(saved)
+        thread = QtCore.QThread(self)
+        worker = _DownloadWorker(self._downloader, info)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.done.connect(self._on_download_done)
+        worker.failed.connect(self._on_download_failed)
+        worker.done.connect(thread.quit)
+        worker.failed.connect(thread.quit)
+        thread.finished.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+        self._download_thread = thread
+        self._download_worker = worker
+        thread.start()
 
+    @QtCore.Slot(object)
     def _on_download_done(self, saved: Path) -> None:
         self.banner.set_status(
-            f"Saved to {saved} — close this app and open the new file."
+            "Saved to your Downloads folder — close this app and open the new file."
         )
 
+    @QtCore.Slot()
     def _on_download_failed(self) -> None:
         self.banner.download_button.setEnabled(True)
         self.banner.set_status("Download failed — please try again or contact Chris.")

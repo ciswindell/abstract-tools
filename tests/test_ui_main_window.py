@@ -43,5 +43,18 @@ def test_download_request_uses_injected_downloader(tmp_path, qtbot):
     info = UpdateInfo("1.3.0", "https://example.test/app.exe", "n")
     window._on_update_found(info)
     window._on_download_requested(info)
-    # message reflects success and points at the saved file's folder
-    assert "Downloads" in window.banner.text_label.text() or str(saved) in window.banner.text_label.text()
+    qtbot.waitUntil(lambda: "Downloads" in window.banner.text_label.text(), timeout=3000)
+    assert "Downloads" in window.banner.text_label.text()
+
+
+def test_download_failure_re_enables_button(qtbot):
+    def bad_downloader(info):
+        raise RuntimeError("boom")
+
+    window = MainWindow(downloader=bad_downloader)
+    qtbot.addWidget(window)
+    info = UpdateInfo("1.3.0", "https://example.test/app.exe", "n")
+    window._on_update_found(info)
+    window._on_download_requested(info)
+    qtbot.waitUntil(lambda: window.banner.download_button.isEnabled(), timeout=3000)
+    assert "failed" in window.banner.text_label.text().lower()
