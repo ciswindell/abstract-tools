@@ -55,7 +55,7 @@ SRP_PARSER_TOOL = Tool(
     name="SRP Parser",
     description=(
         "Read a BLM Serial Register Page export and add a cleaned Case Actions "
-        "sheet plus a verbatim SRP copy to an Abstract Worksheet."
+        "sheet plus a verbatim SRP copy to a Worksheet."
     ),
     category="Bureau of Land Management",
     icon="icons/srp_parser.svg",

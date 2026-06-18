@@ -63,7 +63,7 @@ class DropScreen(QtWidgets.QWidget):
         center.addStretch()
         outer.addLayout(center, 1)
 
-        title = QtWidgets.QLabel("Add SRP data to an Abstract Worksheet")
+        title = QtWidgets.QLabel("Add SRP data to a Worksheet")
         title.setObjectName("h1")
         title.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         center.addWidget(title)
@@ -72,7 +72,7 @@ class DropScreen(QtWidgets.QWidget):
         zones.setSpacing(16)
         self.srp_zone = FileDropZone("Drop SRP file here\n(or click to browse)")
         self.worksheet_zone = FileDropZone(
-            "Drop Abstract Worksheet here\n(or click to browse)"
+            "Drop Worksheet here\n(or click to browse)"
         )
         self.srp_zone.selected.connect(self._on_zone_selected)
         self.worksheet_zone.selected.connect(self._on_zone_selected)
