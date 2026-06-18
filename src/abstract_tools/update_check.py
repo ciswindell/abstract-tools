@@ -8,6 +8,7 @@ import json
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 
 from abstract_tools import version as _v
 
@@ -61,3 +62,32 @@ def check_for_update(
         )
     except Exception:
         return None
+
+
+def _default_get_bytes(url: str) -> bytes:
+    req = urllib.request.Request(url, headers={"User-Agent": "abstract-tools"})
+    with urllib.request.urlopen(req, timeout=_TIMEOUT_SECONDS) as resp:
+        return resp.read()
+
+
+def downloads_dir() -> Path:
+    candidate = Path.home() / "Downloads"
+    return candidate if candidate.is_dir() else Path.home()
+
+
+def download_release(
+    url: str,
+    dest_dir: Path,
+    filename: str,
+    *,
+    get_bytes: Callable[[str], bytes] = _default_get_bytes,
+) -> Path:
+    dest = Path(dest_dir) / filename
+    tmp = dest.with_name(dest.name + ".part")
+    try:
+        tmp.write_bytes(get_bytes(url))
+        tmp.replace(dest)
+        return dest
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
