@@ -170,7 +170,9 @@ planning.
 
 ## Open items to confirm during planning
 
-- Final repo `owner/name` — defaults to `ciswindell/abstract-tools` (the logged-in `gh`
-  account) unless a `landmaninnovations` org is preferred.
+- Final repo `owner/name` — **decided: start at `ciswindell/abstract-tools`** (the logged-in
+  `gh` account); migrate to a `landmaninnovations` org later (supported, low-friction). The
+  `repo` constant in Unit B must therefore be easy to change in one place when the move
+  happens (and a release cut from the new owner will update the app's check on next build).
 - Whether `packaging` is already importable in the bundle, or a tiny local semver comparator
   is preferable (avoid adding a dependency solely for comparison).
