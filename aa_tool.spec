@@ -11,7 +11,16 @@ a = Analysis(
         ("src/aa_tool/resources/fonts/*.ttf", "aa_tool/resources/fonts"),
         ("src/aa_tool/resources/icons/*.svg", "aa_tool/resources/icons"),
     ],
-    hiddenimports=[],
+    # Pillow loads its format handlers dynamically, so PyInstaller's static
+    # scan can miss them. The Batch TIFF→PDF Converter needs the TIFF reader,
+    # the JPEG handler (old-style JPEG-compressed scans), and the PDF SAVE
+    # handler; pypdf assembles the output. List them so they're always bundled.
+    hiddenimports=[
+        "PIL.TiffImagePlugin",
+        "PIL.JpegImagePlugin",
+        "PIL.PdfImagePlugin",
+        "pypdf",
+    ],
     hookspath=[],
     runtime_hooks=[],
     excludes=[],
