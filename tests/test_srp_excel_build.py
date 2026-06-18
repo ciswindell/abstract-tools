@@ -63,6 +63,45 @@ def test_rerun_overwrites_without_duplicating_sheets(tmp_path):
     assert wb.sheetnames == ["Abstract", "SRP Case Actions", "SRP"]
 
 
+def test_srp_tab_font_forced_to_size_11(tmp_path):
+    from openpyxl.styles import Font
+
+    # SRP source: a title cell at size 14 bold, plus the CASE ACTIONS table.
+    srp = tmp_path / "srp.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    ws["A1"] = "Serial Register Page"
+    ws["A1"].font = Font(name="Arial", size=14, bold=True)
+    ws.append(["CASE ACTIONS"])
+    ws.append(["Action Date", "Date Filed", "Action Name", "Action Status",
+               "Action Information"])
+    ws.append(["2020-01-05", "2020-01-01", "Lease Issued", "Active", "Info A"])
+    wb.save(srp)
+
+    # Original worksheet: a cell at size 16 that must NOT be touched.
+    worksheet = tmp_path / "abstract.xlsx"
+    awb = Workbook()
+    aws = awb.active
+    aws.title = "Abstract"
+    aws["A1"] = "KEEP ME"
+    aws["A1"].font = Font(size=16)
+    awb.save(worksheet)
+
+    run_srp_merge(srp, worksheet)
+
+    out = load_workbook(worksheet)
+    srp_ws = out["SRP"]
+    # Every populated cell on the SRP tab is size 11.
+    sizes = {c.font.size for row in srp_ws.iter_rows() for c in row
+             if c.value is not None}
+    assert sizes == {11.0}
+    # Other font attributes are preserved (the title stays Arial bold).
+    assert srp_ws["A1"].font.bold is True
+    assert srp_ws["A1"].font.name == "Arial"
+    # The original worksheet sheet is left untouched.
+    assert out["Abstract"]["A1"].font.size == 16.0
+
+
 def test_failed_replace_leaves_original_intact(tmp_path, monkeypatch):
     import abstract_tools.srp.excel_build as eb
     srp = _make_srp(tmp_path / "srp.xlsx")
