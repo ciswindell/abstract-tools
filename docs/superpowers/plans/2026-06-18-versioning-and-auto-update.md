@@ -37,6 +37,7 @@
 - `.github/workflows/build-windows.yml` — stamp version, publish Release
 - `abstract_tools.spec` — bundle the generated `_build_version` module
 - `.gitignore` — ignore the generated `_build_version.py`
+- `.specify/memory/constitution.md` — add the release/versioning principle (Task 8)
 
 **Generated only in CI (never committed):**
 - `src/abstract_tools/_build_version.py` — `BUILD_VERSION = "X.Y.Z"`, written from the tag before PyInstaller runs.
@@ -1007,7 +1008,82 @@ git commit -m "ci: stamp version from tag and publish public release"
 
 ---
 
-## Task 8: Rollout via GitHub CLI (operational — run after Tasks 1–7 merge to `dev`/`master`)
+## Task 8: Codify the release process in the constitution (governance)
+
+**Files:**
+- Modify: `.specify/memory/constitution.md`
+
+**Why:** The constitution is the authoritative rulebook (it supersedes `CLAUDE.md`). The
+versioning + CI-release discipline this plan establishes MUST be written there so every
+future feature advances the version and ships the same way — otherwise the process lives
+only in this one plan and erodes.
+
+> No automated test (governance doc). Amend via the **Spec Kit constitution workflow**
+> (`/speckit-constitution`) so the version bump, SYNC IMPACT REPORT, and dependent-template
+> review are handled consistently — do NOT hand-edit governance ad hoc. The exact content
+> to apply is given below so the amendment is deterministic.
+
+- [ ] **Step 1: Run the constitution amendment workflow**
+
+Invoke `/speckit-constitution` (the `speckit-constitution` skill) with the changes below.
+This is a **MINOR** bump: `1.0.0 → 1.1.0` (adds a principle + a workflow gate), amendment
+date `2026-06-18`.
+
+- [ ] **Step 2: Add new principle VI** (insert after Principle V "Cohesive, On-Theme UX",
+before "## Technology & Environment Constraints"):
+
+```markdown
+### VI. Versioned, CI-Published Releases
+
+Every change that ships to staff MUST advance the version. The version is single-sourced
+from a Git tag of the form `vMAJOR.MINOR.PATCH` (PATCH for fixes, MINOR for new
+features/tools, MAJOR for breaking overhauls); no version is hand-edited in two places.
+Distributable Windows `.exe` builds MUST be produced by the CI release workflow triggered
+by pushing that tag — never built locally for distribution. Each tagged build MUST publish
+a public GitHub Release with the `.exe` attached. The running app MUST display its version
+in the GUI (so a user can report it) and check the public Release feed for updates,
+degrading silently when offline.
+
+Rationale: Staff run an opaque double-clickable `.exe`. Without a visible, monotonically
+advancing version and a single canonical published download, support is guesswork and users
+drift onto stale builds.
+```
+
+- [ ] **Step 3: Add a release gate** under "## Development Workflow & Quality Gates"
+(append as a new bullet):
+
+```markdown
+- Shipping a release: advance the version by pushing a `vX.Y.Z` tag; CI runs the tests,
+  stamps the version from the tag, and publishes the GitHub Release with the `.exe`. Do
+  NOT distribute locally-built binaries.
+```
+
+- [ ] **Step 4: Bump governance footer** — set the version line to:
+
+```markdown
+**Version**: 1.1.0 | **Ratified**: 2026-06-17 | **Last Amended**: 2026-06-18
+```
+
+and update the top SYNC IMPACT REPORT comment to record `1.0.0 → 1.1.0`, rationale
+"Added Principle VI (Versioned, CI-Published Releases) and a release gate", and confirm the
+plan/spec/tasks templates need no changes (the Constitution Check gate reads principles
+dynamically).
+
+- [ ] **Step 5: Sanity-check the file** parses and the version is consistent.
+
+Run: `grep -n "Version\*\*: 1.1.0" .specify/memory/constitution.md && grep -n "VI. Versioned" .specify/memory/constitution.md`
+Expected: both lines found.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add .specify/memory/constitution.md
+git commit -m "docs: ratify constitution v1.1.0 — versioned CI-published releases"
+```
+
+---
+
+## Task 9: Rollout via GitHub CLI (operational — run after Tasks 1–8 merge to `dev`/`master`)
 
 **Files:** none (operational). Uses the authenticated `gh` CLI (logged in as `ciswindell`).
 
@@ -1080,7 +1156,8 @@ Expected: an `UpdateInfo(latest_version='1.0.0', download_url=…Abstract Tools.
 |---|---|
 | Version source of truth = git tag | Task 1 (module) + Task 7 (CI stamp) |
 | Visible version in GUI | Task 4 |
-| Public Releases host the `.exe` | Task 7 + Task 8 |
+| Public Releases host the `.exe` | Task 7 + Task 9 |
+| Release/versioning discipline written into the constitution | Task 8 |
 | Background, non-blocking update check | Task 6 (`_CheckWorker` on a `QThread`) |
 | Dismissible banner | Task 5 + Task 6 |
 | Download-for-them to Downloads folder | Task 3 + Task 6 |
