@@ -3,6 +3,8 @@
 Abstract Worksheet, saving over the original file.
 """
 
+import os
+import tempfile
 from copy import copy
 from pathlib import Path
 
@@ -88,4 +90,12 @@ def run_srp_merge(srp_path: Path, worksheet_path: Path) -> None:
     srp_source = load_workbook(srp_path, data_only=False).active
     _copy_sheet(srp_source, workbook.create_sheet(_SRP_SHEET))
 
-    workbook.save(worksheet_path)
+    fd, tmp_name = tempfile.mkstemp(suffix=".xlsx", dir=worksheet_path.parent)
+    os.close(fd)
+    tmp_path = Path(tmp_name)
+    try:
+        workbook.save(tmp_path)
+        os.replace(tmp_path, worksheet_path)
+    except BaseException:
+        tmp_path.unlink(missing_ok=True)
+        raise

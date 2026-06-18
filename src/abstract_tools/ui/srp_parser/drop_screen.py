@@ -8,7 +8,6 @@ from pathlib import Path
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from abstract_tools.srp import run_srp_merge
-from abstract_tools.ui import theme
 from abstract_tools.ui.header import Header
 from abstract_tools.ui.srp_parser.drop_zone import FileDropZone
 

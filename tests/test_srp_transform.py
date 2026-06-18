@@ -48,3 +48,15 @@ def test_missing_source_columns_raise():
     bad = pd.DataFrame([["x"]], columns=["Action Name"])
     with pytest.raises(ValueError, match="expected columns"):
         clean_case_actions(bad)
+
+
+def test_existing_action_date_not_overwritten():
+    raw = pd.DataFrame(
+        [["2022-05-05", "2022-05-01", "Renewal", "Active", "Info"]],
+        columns=["Action Date", "Date Filed", "Action Name", "Action Status",
+                 "Action Information"],
+    )
+    out = clean_case_actions(raw)
+    row = out.iloc[0]
+    assert row["Action Date"] == pd.Timestamp("2022-05-05")
+    assert row["Received Date"] == pd.Timestamp("2022-05-01")

@@ -61,3 +61,23 @@ def test_rerun_overwrites_without_duplicating_sheets(tmp_path):
 
     wb = load_workbook(worksheet)
     assert wb.sheetnames == ["Abstract", "SRP Case Actions", "SRP"]
+
+
+def test_failed_replace_leaves_original_intact(tmp_path, monkeypatch):
+    import abstract_tools.srp.excel_build as eb
+    srp = _make_srp(tmp_path / "srp.xlsx")
+    worksheet = _make_worksheet(tmp_path / "abstract.xlsx")
+    original_bytes = worksheet.read_bytes()
+
+    def boom(src, dst):
+        raise OSError("simulated replace failure")
+    monkeypatch.setattr(eb.os, "replace", boom)
+
+    import pytest
+    with pytest.raises(OSError, match="simulated replace failure"):
+        run_srp_merge(srp, worksheet)
+
+    # Original worksheet must be untouched, and no temp file left behind.
+    assert worksheet.read_bytes() == original_bytes
+    xlsx_files = sorted(p.name for p in tmp_path.glob("*.xlsx"))
+    assert xlsx_files == ["abstract.xlsx", "srp.xlsx"]
