@@ -148,11 +148,15 @@ Headless-friendly (`QT_QPA_PLATFORM=offscreen`), no network.
 
 ## One-time / rollout tasks
 
-1. Create the public GitHub repo; push code. Confirm `.gitignore` keeps `example/` out
-   (already verified) and `.exe`/build output stays ignored.
+These are performed via the authenticated **GitHub CLI (`gh`)** from this environment
+(logged in as `ciswindell`) — not as a manual click-through for Chris.
+
+1. Create the public GitHub repo (`gh repo create`) and push code. Confirm `.gitignore`
+   keeps `example/` out (already verified) and `.exe`/build output stays ignored.
 2. Set the `repo` constant in Unit B to the final `owner/name`.
 3. Land Units A–D.
-4. Cut the first real tag (e.g. `v1.0.0`) and confirm: Release appears with the `.exe`,
+4. Cut the first real tag (e.g. `v1.0.0`) — `git push` the tag, then verify with
+   `gh release view` / `gh run watch` — and confirm: Release appears with the `.exe`,
    the app shows `v1.0.0`, and a deliberately-older local build sees the update banner.
 5. Update `pyproject.toml` version handling so it does not contradict the tag-driven version
    (single source of truth).
@@ -166,6 +170,7 @@ planning.
 
 ## Open items to confirm during planning
 
-- Final repo `owner/name`.
+- Final repo `owner/name` — defaults to `ciswindell/abstract-tools` (the logged-in `gh`
+  account) unless a `landmaninnovations` org is preferred.
 - Whether `packaging` is already importable in the bundle, or a tiny local semver comparator
   is preferable (avoid adding a dependency solely for comparison).
