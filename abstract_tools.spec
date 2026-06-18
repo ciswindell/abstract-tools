@@ -24,6 +24,9 @@ a = Analysis(
         # PyInstaller's static scan can miss.
         "pandas",
         "numpy",
+        # Version stamped into _build_version.py by CI before the build;
+        # imported lazily in version.py so list it explicitly.
+        "abstract_tools._build_version",
     ],
     hookspath=[],
     runtime_hooks=[],

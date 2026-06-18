@@ -1,5 +1,8 @@
 [project]
 name = "abstract-tools"
+# Packaging metadata only — does not drive the running app.
+# The runtime/app version is single-sourced from the git tag via _build_version.py
+# (see Constitution Principle VI). Do not attempt to make this dynamic.
 version = "0.1.0"
 requires-python = ">=3.12"
 

@@ -175,10 +175,15 @@ QLabel#savePath {{
     background: {CARD}; border: 1px solid {LINE}; border-radius: 8px; padding: 10px 12px;
 }}
 
+/* ---- Update banner ---- */
+QFrame#updateBanner {{ background: #eaf3ec; border-bottom: 1px solid {LINE}; }}
+QLabel#updateBannerText {{ color: {PINE_DEEP}; font-size: 13px; font-weight: 600; }}
+
 /* ---- Home board ---- */
 QWidget#boardTop {{ background: {CARD}; border-bottom: 1px solid {LINE}; }}
 QWidget#boardBody {{ background: {PAPER}; }}
 QLabel#boardBrand {{ font-family: "{SANS}"; font-size: 19px; font-weight: 800; letter-spacing: -0.3px; }}
+QLabel#versionBadge {{ font-family: "{MONO}"; font-size: 11px; color: {INK_SOFT}; }}
 QLabel#boardHero {{ font-family: "{SANS}"; font-size: 34px; font-weight: 800; letter-spacing: -0.8px; }}
 QLabel#boardHeroSub {{ font-size: 15px; color: {INK_SOFT}; }}
 QLabel#secHead {{ font-size: 13px; font-weight: 700; color: {INK_SOFT}; }}

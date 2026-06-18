@@ -2,6 +2,7 @@ from collections.abc import Callable
 
 from PySide6 import QtCore, QtWidgets
 
+from abstract_tools import version as app_version
 from abstract_tools.tools import Tool, tools_by_category
 from abstract_tools.ui.icons import svg_pixmap
 
@@ -58,6 +59,9 @@ class HomeBoard(QtWidgets.QWidget):
         brand.setObjectName("boardBrand")
         top_row.addWidget(brand)
         top_row.addStretch()
+        self.version_label = QtWidgets.QLabel(app_version.display_version())
+        self.version_label.setObjectName("versionBadge")
+        top_row.addWidget(self.version_label)
         outer.addWidget(top)
 
         scroll = QtWidgets.QScrollArea()

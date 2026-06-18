@@ -5,6 +5,9 @@ on:
     tags: ["v*"]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
@@ -21,6 +24,13 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
         run: python -m pytest -q
+      - name: Stamp version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "BUILD_VERSION = \"${VERSION}\"" > src/abstract_tools/_build_version.py
+          echo "Stamped version ${VERSION}"
       - name: Build executable
         run: pyinstaller --noconfirm abstract_tools.spec
       - name: Upload artifact
@@ -28,3 +38,9 @@ jobs:
         with:
           name: abstract-tools
           path: "dist/Abstract Tools.exe"
+      - name: Publish Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: "dist/Abstract Tools.exe"
+          generate_release_notes: true
