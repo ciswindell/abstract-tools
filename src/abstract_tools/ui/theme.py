@@ -32,6 +32,11 @@ MAT = "#2a2620"
 GREEN = "#2f7d4f"
 YELLOW = "#d8a72a"
 
+# Filesystem path to the white checkmark drawn inside a checked checkbox.
+# Resolved through resource_path so it works both from source and from the
+# bundled exe; as_posix() keeps forward slashes that Qt's QSS url() requires.
+_CHECK_ICON = resource_path("icons/check.svg").as_posix()
+
 STYLESHEET = f"""
 * {{
     font-family: "{SANS}";
@@ -142,6 +147,20 @@ QLabel#chip {{
 }}
 QLabel#warn {{ color: #7a5c00; font-size: 13px; }}
 QLabel#success {{ color: {GREEN}; font-size: 15px; font-weight: 700; }}
+
+/* Checkbox: clear off/on states (the global * rule otherwise leaves the
+   native indicator looking identical when checked and unchecked). */
+QCheckBox {{ color: {INK}; font-size: 14px; spacing: 9px; }}
+QCheckBox::indicator {{
+    width: 18px; height: 18px; border-radius: 5px;
+    border: 1.5px solid {LINE}; background: {CARD};
+}}
+QCheckBox::indicator:hover {{ border-color: {PINE}; }}
+QCheckBox::indicator:checked {{
+    background: {PINE}; border-color: {PINE};
+    image: url("{_CHECK_ICON}");
+}}
+QCheckBox::indicator:checked:hover {{ background: {PINE_DEEP}; border-color: {PINE_DEEP}; }}
 
 /* Dialogs (kept readable and on-theme) */
 QMessageBox {{ background: {CARD}; }}
