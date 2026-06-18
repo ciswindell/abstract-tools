@@ -20,6 +20,10 @@ a = Analysis(
         "PIL.JpegImagePlugin",
         "PIL.PdfImagePlugin",
         "pypdf",
+        # The SRP Parser reads/writes Excel via pandas, whose numeric backend
+        # PyInstaller's static scan can miss.
+        "pandas",
+        "numpy",
     ],
     hookspath=[],
     runtime_hooks=[],
