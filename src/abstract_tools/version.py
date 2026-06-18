@@ -14,7 +14,7 @@ DEV_SENTINEL = "0.0.0+dev"
 
 
 def is_dev_build(text: str = __version__) -> bool:
-    return "+dev" in text or text == DEV_SENTINEL
+    return "+dev" in text
 
 
 def _version_tuple(text: str) -> tuple[int, ...]:

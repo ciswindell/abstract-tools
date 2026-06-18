@@ -20,3 +20,8 @@ def test_dev_build_detection_and_display():
     assert v.display_version("0.0.0+dev") == "dev"
     assert v.display_version("1.2.3") == "v1.2.3"
     assert v.display_version("v1.2.3") == "v1.2.3"
+
+
+def test_is_dev_build_with_plus_dev_suffix():
+    # Locks in the intended behaviour: "+dev" in text is the sole check.
+    assert v.is_dev_build("1.2.3+dev") is True

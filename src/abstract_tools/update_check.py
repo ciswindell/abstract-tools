@@ -41,7 +41,7 @@ def check_for_update(
     repo: str = REPO,
     http_get: Callable[[str], str] = _default_get,
 ) -> UpdateInfo | None:
-    current = current or _v.__version__
+    current = _v.__version__ if current is None else current
     if _v.is_dev_build(current):
         return None
     url = f"https://api.github.com/repos/{repo}/releases/latest"
