@@ -175,6 +175,10 @@ QLabel#savePath {{
     background: {CARD}; border: 1px solid {LINE}; border-radius: 8px; padding: 10px 12px;
 }}
 
+/* ---- Update banner ---- */
+QFrame#updateBanner {{ background: #eaf3ec; border-bottom: 1px solid {LINE}; }}
+QLabel#updateBannerText {{ color: {PINE_DEEP}; font-size: 13px; font-weight: 600; }}
+
 /* ---- Home board ---- */
 QWidget#boardTop {{ background: {CARD}; border-bottom: 1px solid {LINE}; }}
 QWidget#boardBody {{ background: {PAPER}; }}
