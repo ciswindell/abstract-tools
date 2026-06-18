@@ -196,6 +196,19 @@ QPushButton#backToTools {{
 }}
 QPushButton#backToTools:hover {{ color: {PINE_DEEP}; }}
 QFrame#hdrDivider {{ background: {LINE}; max-width: 1px; min-width: 1px; }}
+
+/* ---- Drop zone ---- */
+QFrame#dropZone {{
+    background: {CARD}; border: 2px dashed {LINE};
+    border-radius: 12px; min-height: 150px;
+}}
+QFrame#dropZone:hover {{ border-color: {PINE}; }}
+QFrame#dropZoneActive {{
+    background: {CARD}; border: 2px dashed {PINE};
+    border-radius: 12px; min-height: 150px;
+}}
+QLabel#dropZoneTitle {{ color: {INK_SOFT}; font-size: 14px; }}
+QLabel#dropZoneName {{ color: {PINE}; font-weight: 600; }}
 """
 
 
