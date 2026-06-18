@@ -1,6 +1,7 @@
 from PySide6 import QtWidgets
 
 from abstract_tools import tools as tools_module
+from abstract_tools import version as app_version
 from abstract_tools.ui import theme
 from abstract_tools.ui.home_board import HomeBoard
 
@@ -8,7 +9,7 @@ from abstract_tools.ui.home_board import HomeBoard
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Abstract Tools")
+        self.setWindowTitle(f"Abstract Tools {app_version.display_version()}")
         self.resize(1200, 820)
 
         self.stack = QtWidgets.QStackedWidget()
