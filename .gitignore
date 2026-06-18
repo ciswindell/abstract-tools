@@ -1,6 +1,9 @@
 # Brainstorming visual companion scratch files
 .superpowers/
 
+# Spec Kit plugin skills (installed locally per machine, not committed)
+.claude/
+
 # Real lease data — local ad-hoc testing only; never committed or used for automated tests
 example/
 
