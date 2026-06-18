@@ -25,6 +25,8 @@ class MainWindow(QtWidgets.QMainWindow):
         widget = tool.build(self.show_board)
         if self._current_tool is not None:
             self.stack.removeWidget(self._current_tool)
+            if hasattr(self._current_tool, "shutdown"):
+                self._current_tool.shutdown()
             self._current_tool.deleteLater()
         self._current_tool = widget
         self.stack.addWidget(widget)
@@ -34,6 +36,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.stack.setCurrentWidget(self.board)
         if self._current_tool is not None:
             self.stack.removeWidget(self._current_tool)
+            if hasattr(self._current_tool, "shutdown"):
+                self._current_tool.shutdown()
             self._current_tool.deleteLater()
             self._current_tool = None
 

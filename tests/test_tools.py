@@ -15,3 +15,13 @@ def test_groups_by_category_preserving_order():
     assert list(grouped.keys()) == ["NM State Land Office", "BLM"]
     assert [t.id for t in grouped["NM State Land Office"]] == ["a", "c"]
     assert [t.id for t in grouped["BLM"]] == ["b"]
+
+
+def test_tiff_converter_registered_under_nmslo():
+    from aa_tool.tools import TOOLS
+
+    by_id = {t.id: t for t in TOOLS}
+    tool = by_id["tiff_converter"]
+    assert tool.name == "Batch TIFF to PDF Converter"
+    assert tool.category == "NM State Land Office"
+    assert tool.icon == "icons/tiff_converter.svg"

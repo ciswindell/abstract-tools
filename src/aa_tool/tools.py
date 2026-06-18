@@ -23,6 +23,7 @@ def tools_by_category(tools: list[Tool]) -> dict[str, list[Tool]]:
 
 
 from aa_tool.ui.nmslo_segmentor.tool import NmsloSegmentorTool
+from aa_tool.ui.tiff_converter.tool import TiffConverterTool
 
 SEGMENTOR_TOOL = Tool(
     id="nmslo_segmentor",
@@ -36,4 +37,16 @@ SEGMENTOR_TOOL = Tool(
     build=lambda on_back: NmsloSegmentorTool(on_back),
 )
 
-TOOLS: list[Tool] = [SEGMENTOR_TOOL]
+TIFF_CONVERTER_TOOL = Tool(
+    id="tiff_converter",
+    name="Batch TIFF to PDF Converter",
+    description=(
+        "Convert a folder of TIFFs to PDFs, mirroring the folder structure "
+        "and copying any non-TIFF files across unchanged."
+    ),
+    category="NM State Land Office",
+    icon="icons/tiff_converter.svg",
+    build=lambda on_back: TiffConverterTool(on_back),
+)
+
+TOOLS: list[Tool] = [SEGMENTOR_TOOL, TIFF_CONVERTER_TOOL]

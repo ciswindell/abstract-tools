@@ -18,3 +18,13 @@ def test_no_back_link_without_callback(qtbot):
     header = Header(active_step=1)
     qtbot.addWidget(header)
     assert header.back_button is None
+
+
+def test_custom_steps_render(qtbot):
+    from PySide6 import QtWidgets
+
+    header = Header(active_step=2, steps=["1 · Open", "2 · Convert"])
+    qtbot.addWidget(header)
+    labels = [w.text() for w in header.findChildren(QtWidgets.QLabel)]
+    assert "2 · Convert" in labels
+    assert "3 · Export" not in labels
