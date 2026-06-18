@@ -61,3 +61,33 @@ def test_do_convert_writes_pdfs(qtbot, tmp_path):
 
     assert result.converted == 1
     assert (tool.plan_screen.out_dir / "a.pdf").exists()
+
+
+def test_shutdown_while_converting_is_safe(qtbot, tmp_path):
+    src = tmp_path / "scans"
+    _make_tiff(src / "a.tif", pages=2)
+    _make_tiff(src / "b.tif", pages=2)
+
+    tool = TiffConverterTool(on_back_to_tools=lambda: None)
+    qtbot.addWidget(tool)
+    tool.load_folder(src)
+    ps = tool.plan_screen
+    ps._on_convert_clicked()          # starts the background QThread
+    tool.shutdown()                   # must quit+wait without crashing
+    assert ps._thread is None or not ps._thread.isRunning()
+
+
+def test_shutdown_with_no_conversion_is_noop(qtbot):
+    tool = TiffConverterTool(on_back_to_tools=lambda: None)
+    qtbot.addWidget(tool)
+    # No load_folder called — plan_screen is None; shutdown must not raise.
+    tool.shutdown()
+    # Also test PlanScreen shutdown with no thread started.
+    from aa_tool.ui.tiff_converter.plan_screen import PlanScreen
+    ps = PlanScreen(
+        source=__import__("pathlib").Path("."),
+        on_back_to_tools=lambda: None,
+        on_new_folder=lambda: None,
+    )
+    qtbot.addWidget(ps)
+    ps.shutdown()  # _thread is None — must not raise

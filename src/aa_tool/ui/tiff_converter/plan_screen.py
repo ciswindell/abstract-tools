@@ -23,6 +23,7 @@ def _format_size(num_bytes: int) -> str:
         if size < 1024 or unit == "TB":
             return f"{int(size)} B" if unit == "B" else f"{size:.1f} {unit}"
         size /= 1024
+    return f"{size:.1f} PB"
 
 
 class ConversionWorker(QtCore.QObject):
@@ -154,6 +155,20 @@ class PlanScreen(QtWidgets.QWidget):
 
         center.addStretch()
 
+    def shutdown(self) -> None:
+        """Stop the conversion thread before this screen is destroyed.
+
+        There is no cancel, so this blocks until the in-flight conversion
+        finishes — destroying a running QThread crashes Qt.
+        """
+        if self._thread is not None and self._thread.isRunning():
+            self._thread.quit()
+            self._thread.wait()
+
+    def closeEvent(self, event):  # noqa: N802 (Qt override)
+        self.shutdown()
+        super().closeEvent(event)
+
     def _change_folder(self) -> None:
         chosen = QtWidgets.QFileDialog.getExistingDirectory(
             self, "Choose output folder", str(self.out_dir)
@@ -161,6 +176,12 @@ class PlanScreen(QtWidgets.QWidget):
         if chosen:
             self.out_dir = Path(chosen)
             self.path_label.setText(str(self.out_dir))
+            self.summary = summarize_plan(plan_actions(self.source, self.out_dir, force=False))
+            self.summary_label.setText(
+                f"{self.summary.tiff_count} TIFFs to convert\n"
+                f"{self.summary.copy_count} other files to copy\n"
+                f"{_format_size(self.summary.total_bytes)} total"
+            )
 
     def do_convert(self) -> RunSummary:
         """Synchronous convert (used by tests and as the worker's core call)."""

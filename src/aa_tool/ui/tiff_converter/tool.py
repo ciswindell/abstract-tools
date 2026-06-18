@@ -75,6 +75,7 @@ class TiffConverterTool(QtWidgets.QWidget):
         )
         if self.plan_screen is not None:
             self.stack.removeWidget(self.plan_screen)
+            self.plan_screen.shutdown()
             self.plan_screen.deleteLater()
         index = self.stack.addWidget(screen)
         self.stack.setCurrentIndex(index)
@@ -84,5 +85,14 @@ class TiffConverterTool(QtWidgets.QWidget):
         self.stack.setCurrentIndex(self.open_index)
         if self.plan_screen is not None:
             self.stack.removeWidget(self.plan_screen)
+            self.plan_screen.shutdown()
             self.plan_screen.deleteLater()
             self.plan_screen = None
+
+    def shutdown(self) -> None:
+        if self.plan_screen is not None:
+            self.plan_screen.shutdown()
+
+    def closeEvent(self, event):  # noqa: N802 (Qt override)
+        self.shutdown()
+        super().closeEvent(event)
