@@ -88,6 +88,11 @@ QLabel#pageSrc {{ font-family: "{MONO}"; font-size: 11px; color: {INK_SOFT}; }}
 
 /* ---- Control strip ---- */
 QWidget#controls {{ background: {PAPER_2}; border-bottom: 1px solid {LINE}; }}
+/* One-line explanation strip under the controls (e.g. why C did nothing). */
+QLabel#hint {{
+    background: #fbf3dc; color: #7a5c00; font-size: 13px;
+    padding: 7px 18px; border-bottom: 1px solid {LINE};
+}}
 QPushButton#nav {{
     background: {CARD}; border: 1px solid {LINE}; border-radius: 9px;
     font-size: 18px; min-width: 44px; min-height: 48px;

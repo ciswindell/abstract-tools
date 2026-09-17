@@ -12,10 +12,12 @@ from __future__ import annotations
 import functools
 import io
 import logging
+import os
 import shutil
+import struct
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 # pypdf logs WARNING for every malformed/partial PDF it reads; the skip-check
@@ -35,6 +37,262 @@ _LEGAL_RATIO = LEGAL_INCHES[1] / LEGAL_INCHES[0]
 _RATIO_CUTOFF = (_LETTER_RATIO + _LEGAL_RATIO) / 2
 
 TIFF_EXTENSIONS = {".tif", ".tiff"}
+
+
+class _TiffReader(io.RawIOBase):
+    """The file object every TIFF is opened through.
+
+    Pillow hands the file *descriptor* to libtiff for a compressed TIFF, and
+    libtiff moves the OS file offset as it decodes. A buffered Python reader
+    then reads the wrong bytes afterwards: Pillow parses image data as a tag
+    directory and warns ``UserWarning: Truncated File Read``, losing the file's
+    EXIF — including the orientation that decides whether a page is written
+    upright. So this reader positions the descriptor immediately before every
+    read of its own, which libtiff's seeking cannot disturb, and still exposes
+    ``fileno()`` so libtiff decodes straight from the descriptor. (Hiding the
+    descriptor also fixes the EXIF, but drops Pillow into a path that reads the
+    whole file into memory once per page.)
+
+    Reads past the end of the file are zero-padded rather than returning short,
+    because a tag whose data offset runs past EOF otherwise aborts Pillow's
+    directory parse *before* it reads the pointer to the next page, silently
+    dropping every page after the damaged one.
+    """
+
+    def __init__(self, path: Path):
+        super().__init__()
+        self._fd = os.open(path, os.O_RDONLY)
+        self._size = os.fstat(self._fd).st_size
+        self._pos = 0
+
+    def readable(self) -> bool:
+        return True
+
+    def seekable(self) -> bool:
+        return True
+
+    def fileno(self) -> int:
+        return self._fd
+
+    def flush(self) -> None:
+        """Pillow flushes before handing the descriptor to libtiff."""
+
+    def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
+        if whence == io.SEEK_SET:
+            self._pos = offset
+        elif whence == io.SEEK_CUR:
+            self._pos += offset
+        else:
+            self._pos = self._size + offset
+        os.lseek(self._fd, self._pos, os.SEEK_SET)  # libtiff decodes from here
+        return self._pos
+
+    def tell(self) -> int:
+        return self._pos
+
+    def read(self, size: int = -1) -> bytes:
+        if size is None or size < 0:
+            size = max(0, self._size - self._pos)
+        os.lseek(self._fd, self._pos, os.SEEK_SET)  # undo any seeking libtiff did
+        chunks: list[bytes] = []
+        remaining = size
+        while remaining > 0:
+            block = os.read(self._fd, remaining)
+            if not block:
+                break
+            chunks.append(block)
+            remaining -= len(block)
+        data = b"".join(chunks)
+        if len(data) < size:
+            data += b"\x00" * (size - len(data))
+        self._pos += size  # a padded read still advances, so tell() stays honest
+        return data
+
+    def readinto(self, buffer) -> int:  # noqa: ANN001 (buffer protocol)
+        # Report the real end of the file here: read() pads deliberately, and a
+        # readinto that never returns 0 makes io.RawIOBase.readall() loop forever.
+        if self._pos >= self._size:
+            return 0
+        data = self.read(min(len(buffer), self._size - self._pos))
+        buffer[: len(data)] = data
+        return len(data)
+
+    def close(self) -> None:
+        try:
+            if self._fd >= 0:
+                os.close(self._fd)
+                self._fd = -1
+        finally:
+            super().close()
+
+
+# TIFF structure constants (see the TIFF 6.0 spec / BigTIFF).
+_CLASSIC_MAGIC = 42
+_BIG_MAGIC = 43
+_STRIP_OFFSETS, _STRIP_BYTE_COUNTS = 273, 279
+_TILE_OFFSETS, _TILE_BYTE_COUNTS = 324, 325
+_INT_TYPES = {1: 1, 3: 2, 4: 4, 16: 8}  # BYTE, SHORT, LONG, LONG8
+# Width in bytes of every TIFF field type (6.0 plus the BigTIFF additions).
+_TYPE_WIDTHS = {
+    1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 6: 1, 7: 1, 8: 2, 9: 4,
+    10: 8, 11: 4, 12: 8, 13: 4, 16: 8, 17: 8, 18: 8,
+}
+_MAX_PAGES = 100_000  # a lease scan never approaches this; a corrupt chain might
+
+
+@dataclass(frozen=True)
+class TiffScan:
+    """What a TIFF's directory chain says, read without trusting Pillow.
+
+    ``offsets`` is one file offset per page, in order. The rest name damage, by
+    1-based page number: ``partial_pages`` have pixel data running past the end
+    of the file, ``damaged_tag_pages`` have a tag whose data does (the damage
+    Pillow abandons the page chain over), and ``truncated`` means the chain
+    itself ran off the end.
+    """
+
+    offsets: tuple[int, ...]
+    truncated: bool = False
+    partial_pages: tuple[int, ...] = ()
+    damaged_tag_pages: tuple[int, ...] = ()
+
+    @property
+    def pages(self) -> int:
+        return len(self.offsets)
+
+    @property
+    def damaged(self) -> bool:
+        return self.truncated or bool(self.partial_pages or self.damaged_tag_pages)
+
+
+def _read_ints(
+    fp, endian: str, typ: int, count: int, raw: bytes, size: int, file_size: int
+) -> list[int]:
+    """Values of an integer-typed tag, whether stored inline or at an offset."""
+    unit = _INT_TYPES.get(typ)
+    if unit is None:
+        return []
+    if unit * count > len(raw):
+        (offset,) = struct.unpack(endian + ("Q" if size == 8 else "L"), raw[:size])
+        want = unit * count
+        # A corrupt count can claim gigabytes. Reading it would raise MemoryError,
+        # which is not an OSError and so escapes every handler up to the UI thread.
+        if offset + want > file_size:
+            return []
+        fp.seek(offset)
+        raw = fp.read(want)
+        if len(raw) < want:
+            return []
+    code = {1: "B", 2: "H", 4: "L", 8: "Q"}[unit]
+    return list(struct.unpack(f"{endian}{count}{code}", raw[: unit * count]))
+
+
+def scan_tiff_ifds(path: Path) -> TiffScan:
+    """Walk a TIFF's page (IFD) chain using only each directory's own structure.
+
+    Every page is an IFD: an entry count, that many fixed-width entries, then the
+    offset of the next page. Following it needs none of the out-of-line tag data
+    that Pillow gives up on, so a damaged tag cannot hide a page from this walk.
+    """
+    try:
+        file_size = path.stat().st_size
+        with open(path, "rb") as fp:
+            header = fp.read(16)
+            if len(header) < 8:
+                msg = f"Not a readable TIFF (file is {len(header)} bytes): {path}"
+                raise ConversionError(msg)
+            if header[:2] == b"II":
+                endian = "<"
+            elif header[:2] == b"MM":
+                endian = ">"
+            else:
+                msg = f"Not a TIFF (byte order mark is {header[:2]!r}): {path}"
+                raise ConversionError(msg)
+
+            (magic,) = struct.unpack(endian + "H", header[2:4])
+            if magic == _CLASSIC_MAGIC:
+                big, entry_size, count_size, offset_size = False, 12, 2, 4
+                (next_ifd,) = struct.unpack(endian + "L", header[4:8])
+            elif magic == _BIG_MAGIC:
+                (offset_bytes,) = struct.unpack(endian + "H", header[4:6])
+                if offset_bytes != 8 or len(header) < 16:
+                    msg = f"Unsupported BigTIFF layout: {path}"
+                    raise ConversionError(msg)
+                big, entry_size, count_size, offset_size = True, 20, 8, 8
+                (next_ifd,) = struct.unpack(endian + "Q", header[8:16])
+            else:
+                msg = f"Not a TIFF (magic number {magic}): {path}"
+                raise ConversionError(msg)
+
+            count_code = endian + ("Q" if big else "H")
+            offset_code = endian + ("Q" if big else "L")
+            offsets: list[int] = []
+            partial: list[int] = []
+            damaged: list[int] = []
+            seen: set[int] = set()
+            truncated = False
+
+            while next_ifd and next_ifd not in seen and len(offsets) < _MAX_PAGES:
+                seen.add(next_ifd)
+                if next_ifd + count_size > file_size:
+                    truncated = True
+                    break
+                fp.seek(next_ifd)
+                (entries,) = struct.unpack(count_code, fp.read(count_size))
+                block = fp.read(entries * entry_size)
+                if len(block) < entries * entry_size:
+                    # The directory runs off the end: this page cannot be read at
+                    # all, and counting it would condemn the intact pages before it.
+                    truncated = True
+                    break
+                offsets.append(next_ifd)
+                tail_pos = fp.tell()
+                cut_pixels, bad_tag = _inspect_entries(
+                    fp, block, endian, big, entry_size, offset_size, file_size
+                )
+                if cut_pixels:
+                    partial.append(len(offsets))
+                if bad_tag:
+                    damaged.append(len(offsets))
+                fp.seek(tail_pos)  # inspecting entries reads tag data elsewhere
+                tail = fp.read(offset_size)
+                if len(tail) < offset_size:
+                    truncated = True
+                    break
+                (next_ifd,) = struct.unpack(offset_code, tail)
+
+            if not offsets:
+                msg = f"TIFF has no readable pages: {path}"
+                raise ConversionError(msg)
+            return TiffScan(tuple(offsets), truncated, tuple(partial), tuple(damaged))
+    except OSError as exc:
+        msg = f"Could not read {path}: {exc}"
+        raise ConversionError(msg) from exc
+
+
+def _inspect_entries(
+    fp, block, endian: str, big: bool, entry_size: int, offset_size: int, file_size: int
+) -> tuple[bool, bool]:
+    """Inspect one page's tag entries: (pixel data cut off, tag data past EOF)."""
+    tag_code = endian + ("HHQ8s" if big else "HHL4s")
+    data_offsets: list[int] = []
+    byte_counts: list[int] = []
+    bad_tag = False
+    for i in range(0, len(block), entry_size):
+        tag, typ, count, raw = struct.unpack(tag_code, block[i : i + entry_size])
+        width = _TYPE_WIDTHS.get(typ)
+        if width is not None and width * count > len(raw):
+            (offset,) = struct.unpack(endian + ("Q" if big else "L"), raw[:offset_size])
+            if offset + width * count > file_size:
+                bad_tag = True
+        if tag in (_STRIP_OFFSETS, _TILE_OFFSETS):
+            data_offsets = _read_ints(fp, endian, typ, count, raw, offset_size, file_size)
+        elif tag in (_STRIP_BYTE_COUNTS, _TILE_BYTE_COUNTS):
+            byte_counts = _read_ints(fp, endian, typ, count, raw, offset_size, file_size)
+    if not data_offsets or len(byte_counts) != len(data_offsets):
+        return False, bad_tag  # nothing dependable to check the pixel data against
+    cut = any(o + c > file_size for o, c in zip(data_offsets, byte_counts))
+    return cut, bad_tag
 
 
 def _standardize_page(frame):  # (verbatim from CLI)
@@ -60,14 +318,14 @@ def _standardize_page(frame):  # (verbatim from CLI)
     return canvas, dpi
 
 
-def count_tiff_pages(path: Path) -> int:  # (verbatim from CLI)
-    from PIL import Image
+def count_tiff_pages(path: Path) -> int:
+    """The page count, read from the directory chain rather than from Pillow.
 
-    try:
-        with Image.open(path) as img:
-            return getattr(img, "n_frames", 1)
-    except Exception as exc:  # noqa: BLE001
-        raise ConversionError(f"Pillow could not read {path}: {exc}") from exc
+    Pillow under-reports this on a TIFF with a damaged tag — and by exactly the
+    pages it would also fail to convert, so a Pillow-vs-Pillow check cannot catch
+    a short PDF. This number is independent of that failure.
+    """
+    return scan_tiff_ifds(path).pages
 
 
 def count_pdf_pages(path: Path) -> int:  # (verbatim from CLI)
@@ -91,47 +349,103 @@ def should_skip(src: Path, dst: Path) -> bool:  # (verbatim from CLI)
         return False
 
 
-def _convert_pillow(src: Path, dst: Path, standardize: bool = True) -> None:  # (verbatim from CLI)
+def _convert_pillow(src: Path, dst: Path, standardize: bool, scan: TiffScan) -> None:
+    """Write every page the directory chain names into one PDF."""
     from PIL import Image, JpegImagePlugin  # noqa: F401 — JPEG SAVE handler
     from pypdf import PdfWriter
 
     dst.parent.mkdir(parents=True, exist_ok=True)
     try:
-        img = Image.open(src)
-        n_frames = getattr(img, "n_frames", 1)
+        reader = _TiffReader(src)
+        try:
+            img = Image.open(reader)
+            _restore_lost_pages(img, scan)
 
-        if not standardize:
-            pages = []
-            for i in range(n_frames):
+            if not standardize:
+                pages = []
+                for i in range(scan.pages):
+                    img.seek(i)
+                    pages.append(img.convert("RGB"))
+                pages[0].save(dst, "PDF", save_all=True, append_images=pages[1:])
+                return
+
+            writer = PdfWriter()
+            for i in range(scan.pages):
                 img.seek(i)
-                pages.append(img.convert("RGB"))
-            pages[0].save(dst, "PDF", save_all=True, append_images=pages[1:])
-            return
-
-        writer = PdfWriter()
-        for i in range(n_frames):
-            img.seek(i)
-            canvas, dpi = _standardize_page(img.convert("RGB"))
-            buf = io.BytesIO()
-            canvas.save(buf, "PDF", resolution=dpi)
-            buf.seek(0)
-            writer.append(buf)
-        with open(dst, "wb") as f:
-            writer.write(f)
+                canvas, dpi = _standardize_page(img.convert("RGB"))
+                buf = io.BytesIO()
+                canvas.save(buf, "PDF", resolution=dpi)
+                buf.seek(0)
+                writer.append(buf)
+            with open(dst, "wb") as f:
+                writer.write(f)
+        finally:
+            reader.close()
     except Exception as exc:  # noqa: BLE001
         raise ConversionError(f"Pillow convert failed for {src}: {exc}") from exc
 
 
-def convert_one(src: Path, dst: Path, standardize: bool = True) -> None:  # (adapted from CLI)
-    """Convert one TIFF to PDF and verify the output page count matches the source."""
-    src_pages = count_tiff_pages(src)
-    _convert_pillow(src, dst, standardize=standardize)
+def _restore_lost_pages(img, scan: TiffScan) -> None:
+    """Hand Pillow the page offsets it lost, when it found fewer than the chain has.
+
+    ``TiffImageFile`` seeks by a list of directory offsets and only consults the
+    chain when that list is short. Filling the list in is enough to reach a page
+    Pillow could not walk to; it still does all the decoding itself.
+    """
+    if not hasattr(img, "_frame_pos"):  # an unexpected Pillow — leave it alone
+        return
+    if scan.pages <= _pillow_page_count(img):
+        return
+    img._frame_pos = list(scan.offsets)
+    img._n_frames = scan.pages
+    img.is_animated = scan.pages > 1
+    img._TiffImageFile__next = 0
+
+
+def _pillow_page_count(img) -> int:
+    """How many pages Pillow reaches on its own.
+
+    Reading ``n_frames`` walks the whole directory chain, and on a damaged file
+    that walk can raise — a chain ending at EOF reads as a phantom empty
+    directory once past-EOF reads are padded. Treat any failure as "Pillow got
+    nowhere", which is exactly when the offsets from the scan are needed.
+    """
+    try:
+        return img.n_frames
+    except Exception:  # noqa: BLE001 — a probe; never a reason to fail a file
+        return 1
+
+
+def _damage_notes(scan: TiffScan) -> list[str]:
+    """Plain-English notes about what was wrong with a file we converted anyway."""
+    notes = []
+    if scan.damaged_tag_pages:
+        listed = ", ".join(str(n) for n in scan.damaged_tag_pages)
+        notes.append(f"repaired damaged tag on page {listed}")
+    if scan.truncated:
+        notes.append("file ends mid-page-directory")
+    if scan.partial_pages:
+        listed = ", ".join(str(n) for n in scan.partial_pages)
+        notes.append(f"incomplete scan data on page {listed}")
+    return notes
+
+
+def convert_one(src: Path, dst: Path, standardize: bool = True) -> list[str]:
+    """Convert one TIFF to PDF, verifying the output against the source page count.
+
+    Returns notes about any damage that had to be worked around — empty for a
+    healthy file. The page count comes from :func:`scan_tiff_ifds`, so a PDF that
+    is short a page fails here instead of being reported as converted.
+    """
+    scan = scan_tiff_ifds(src)
+    _convert_pillow(src, dst, standardize=standardize, scan=scan)
     out_pages = count_pdf_pages(dst)
-    if out_pages != src_pages:
+    if out_pages != scan.pages:
         raise ConversionError(
-            f"Page count mismatch for {src}: source has {src_pages} pages, "
+            f"Page count mismatch for {src}: source has {scan.pages} pages, "
             f"output has {out_pages}"
         )
+    return _damage_notes(scan)
 
 
 @dataclass(frozen=True)
@@ -210,15 +524,19 @@ class RunSummary:
     copied: int
     dirs_created: int
     failures: list[tuple[Path, str]]
+    # Files that converted completely but had damage worked around; each note
+    # says what, so the user knows which PDFs are worth a look.
+    repaired: list[tuple[Path, str]] = field(default_factory=list)
 
 
-def _run_convert(action: Action, standardize: bool) -> tuple[Action, str | None]:
-    """Execute one Convert action. Returns (action, error_or_None); never raises."""
+def _run_convert(
+    action: Action, standardize: bool
+) -> tuple[Action, str | None, list[str]]:
+    """Execute one Convert action. Returns (action, error_or_None, notes); never raises."""
     try:
-        convert_one(action.src, action.dst, standardize=standardize)
-        return action, None
+        return action, None, convert_one(action.src, action.dst, standardize=standardize)
     except Exception as exc:  # noqa: BLE001
-        return action, f"{type(exc).__name__}: {exc}"
+        return action, f"{type(exc).__name__}: {exc}", []
 
 
 def run_conversion(
@@ -237,8 +555,6 @@ def run_conversion(
     progress_cb(done, total, label) is called after each conversion completes,
     where total is the number of conversions.
     """
-    import os
-
     workers = workers or min(8, (os.cpu_count() or 2))
 
     actions = plan_actions(source_root, output_root, force=force)
@@ -264,15 +580,18 @@ def run_conversion(
     converted = 0
     total = len(convert_actions)
     done = 0
+    repaired: list[tuple[Path, str]] = []
     if convert_actions:
         worker = functools.partial(_run_convert, standardize=standardize)
         with ThreadPoolExecutor(max_workers=workers) as pool:
             futures = [pool.submit(worker, a) for a in convert_actions]
             for fut in as_completed(futures):
-                action, error = fut.result()
+                action, error, notes = fut.result()
                 done += 1
                 if error is None:
                     converted += 1
+                    if notes:
+                        repaired.append((action.src, "; ".join(notes)))
                 else:
                     failures.append((action.src, error))
                 if progress_cb is not None:
@@ -283,4 +602,5 @@ def run_conversion(
         copied=copied,
         dirs_created=dirs_created,
         failures=failures,
+        repaired=sorted(repaired),
     )
