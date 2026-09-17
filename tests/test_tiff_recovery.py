@@ -199,3 +199,119 @@ def test_scan_stops_on_a_chain_that_points_back_at_itself(tmp_path):
     src.write_bytes(bytes(data))
 
     assert scan_tiff_ifds(src).pages == 1
+
+
+# --- damage that runs off the end of the file --------------------------------
+# build_tiff lays every page directory out before the pixel data, so cutting the
+# file short leaves complete directories with no scan data behind them.
+
+def _ifd_length(entries: int = 9) -> int:
+    from tests.tiff_builders import ENTRY_SIZE
+
+    return 2 + entries * ENTRY_SIZE + 4
+
+
+def test_pages_survive_a_directory_that_is_cut_off(tmp_path):
+    """A third page directory cut off mid-entries must not condemn pages 1-2."""
+    src = tmp_path / "cut_dir.tif"
+    src.write_bytes(_build_tiff([WHITE, BLACK, GREY])[: 8 + 2 * _ifd_length() + 5])
+
+    scan = scan_tiff_ifds(src)
+    assert scan.pages == 2  # the unreadable directory is not counted as a page
+    assert scan.truncated
+
+    notes = convert_one(src, tmp_path / "cut_dir.pdf")
+
+    assert count_pdf_pages(tmp_path / "cut_dir.pdf") == 2
+    assert any("ends mid-page-directory" in n for n in notes)
+
+
+def test_chain_ending_exactly_at_eof_still_converts(tmp_path):
+    """Zero-padded reads make Pillow see a phantom page; it must not fail the file."""
+    src = tmp_path / "cut_chain.tif"
+    src.write_bytes(_build_tiff([WHITE, BLACK, GREY])[: 8 + 2 * _ifd_length()])
+
+    notes = convert_one(src, tmp_path / "cut_chain.pdf")
+
+    assert count_pdf_pages(tmp_path / "cut_chain.pdf") == 2
+    assert notes
+
+
+def test_scan_never_reads_more_than_the_file_holds(tmp_path):
+    """A corrupt tag count asked for a ~17 GB read. Under a memory limit that
+    raises MemoryError, which is not an OSError, so it escaped every handler and
+    left the Convert screen hung with no result."""
+    import struct
+
+    from tests.tiff_builders import ENTRY_SIZE, STRIP_BYTE_COUNTS
+
+    data = bytearray(_build_tiff([WHITE, BLACK]))
+    for i in range(9):
+        offset = 8 + 2 + i * ENTRY_SIZE
+        if struct.unpack_from("<H", data, offset)[0] == STRIP_BYTE_COUNTS:
+            struct.pack_into("<L", data, offset + 4, 0xFFFFFFFF)  # count
+            break
+    src = tmp_path / "huge_count.tif"
+    src.write_bytes(bytes(data))
+    file_size = src.stat().st_size
+
+    asked = []
+    real_open = __import__("builtins").open
+
+    class Spy:
+        def __init__(self, fp):
+            self._fp = fp
+
+        def read(self, size=-1):
+            asked.append(size)
+            return self._fp.read(size)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return self._fp.__exit__(*exc)
+
+        def __getattr__(self, name):
+            return getattr(self._fp, name)
+
+    import abstract_tools.tiff_convert as module
+
+    def spying_open(*args, **kwargs):
+        return Spy(real_open(*args, **kwargs))
+
+    module.open = spying_open  # noqa: A001 — module-level shim for this test only
+    try:
+        scan = scan_tiff_ifds(src)
+    finally:
+        del module.open
+
+    assert scan.pages == 2
+    assert max(asked) <= file_size
+
+
+def test_reader_keeps_the_file_descriptor(tmp_path):
+    """libtiff decodes through the descriptor; hiding it re-reads the whole file
+    once per page (measured: 3.5 GB of reads for one 118 MB, 30-page TIFF)."""
+    from abstract_tools.tiff_convert import _TiffReader
+
+    src = _healthy(tmp_path / "fine.tif")
+    reader = _TiffReader(src)
+    try:
+        assert reader.fileno() > 0
+    finally:
+        reader.close()
+
+
+def test_reader_signals_eof_so_readall_terminates(tmp_path):
+    """read() pads past EOF on purpose; readinto must still report 0 at the end
+    or io.RawIOBase.readall() loops forever appending zeros."""
+    from abstract_tools.tiff_convert import _TiffReader
+
+    src = _healthy(tmp_path / "fine.tif")
+    reader = _TiffReader(src)
+    try:
+        reader.seek(0, 2)
+        assert reader.readinto(bytearray(16)) == 0
+    finally:
+        reader.close()

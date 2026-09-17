@@ -1,7 +1,7 @@
 # Design: TIFF Damage Recovery (no silently dropped pages)
 
 **Date:** 2026-09-17
-**Status:** Built
+**Status:** Built (revised after branch review)
 **Author:** Chris (with Claude)
 
 ## Problem
@@ -84,16 +84,29 @@ None of the 190 files in this delivery had this damage. The guard exists so that
 
 ### Unit A — `_TiffReader`: the file object every TIFF is opened through
 
-An `io.RawIOBase` wrapper over the file, with two deliberate differences from
-`open(path, "rb")`:
+An `io.RawIOBase` wrapper over the file descriptor, with two deliberate
+differences from `open(path, "rb")`:
 
-- **No `fileno()`.** Pillow then feeds libtiff from Python-side reads and its own
-  reads stay in sync — Fault 1 cannot happen. Cost measured at zero (below).
+- **Every read positions the descriptor first** (`os.lseek` then `os.read`, no
+  buffering). Whatever libtiff did to the file offset while decoding is undone
+  before Pillow's next read, so Pillow's directory parses always land on the
+  bytes they asked for — Fault 1, at the source. `fileno()` is still exposed, so
+  libtiff keeps decoding straight from the descriptor.
+
+  Hiding `fileno()` also fixes Fault 1 and was the first implementation, but it
+  drops Pillow into `decoder.decode(self.fp.read())` — the whole file into a
+  Python `bytes` once **per page**. Measured on a 118 MB 30-page JPEG-in-TIFF:
+  3.5 GB of reads, 14.5 s, 333 MB peak RSS, against 2.1 s and 226 MB for the
+  descriptor version. The delivery that prompted this work is one page per file,
+  which is why the first round of timings showed no difference.
 - **Reads past EOF are zero-padded** instead of returning short. Pillow's
   directory parse no longer aborts on a tag pointing past the end, so it reaches
   the next-page pointer and the chain survives — Fault 2, at the source. The
   damaged tag's value is garbage, which is the correct trade: a lost
   ImageDescription costs nothing, a lost page costs a document.
+
+  `readinto` still reports the true end of the file, so `RawIOBase.readall()`
+  cannot loop forever on the padding.
 
 ### Unit B — `scan_tiff_ifds()`: the page count, without Pillow
 
@@ -108,6 +121,13 @@ saw, by 1-based page — `damaged_tag_pages` (a tag pointing past EOF),
 `partial_pages` (pixel data running past EOF, from the strip/tile offsets and byte
 counts), and `truncated` (the chain itself ran off the end).
 
+A directory that is itself cut off is **not** counted as a page: it cannot be
+read, and counting it would fail the page-count check and throw away the intact
+pages before it. Tag data is never read beyond the end of the file either — a
+corrupt count can claim gigabytes, and the resulting `MemoryError` is not an
+`OSError`, so it would escape every handler up to the UI thread and leave the
+Convert screen waiting for a result that never comes.
+
 ### Unit C — `_restore_lost_pages()`
 
 `TiffImageFile._seek` walks a list of directory offsets and only consults the
@@ -121,6 +141,9 @@ than crashing.
 - `count_tiff_pages` returns the scan's page count, so `convert_one`'s check
   compares the output against a number Pillow's tag parsing cannot influence. A
   short PDF now fails instead of being reported as converted.
+- Asking Pillow how many pages *it* found (to decide whether to hand it the lost
+  offsets) is a probe wrapped in `try/except`: reading `n_frames` walks the whole
+  chain and can raise on a damaged file, and a probe must never fail a file.
 - `convert_one` returns notes describing what was worked around; `RunSummary`
   gains `repaired: list[tuple[Path, str]]`, filled only for files that converted
   **completely** (anything else is still a failure).
@@ -141,6 +164,12 @@ it a success, failed outright on the two other damaged fixtures, and emitted
 `Truncated File Read` on the JPEG fixture.
 
 - `scan_tiff_ifds` finds 3 pages where `Image.n_frames` reports 1.
+- A file whose third directory is cut off still converts its two intact pages.
+- A chain ending exactly at EOF still converts, rather than failing on the
+  phantom empty directory that padded reads produce.
+- The scan never requests more bytes than the file holds (asserted against a
+  corrupt tag count of `0xFFFFFFFF`).
+- The reader keeps its descriptor, and reports EOF to `readinto`.
 - A damaged TIFF converts to a 3-page PDF, pages in the right order (checked by
   rendering each page and comparing its shade).
 - A TIFF Pillow cannot open at all still converts, in full.
@@ -153,12 +182,14 @@ it a success, failed outright on the two other damaged fixtures, and emitted
 
 ## Verification (Principle IV)
 
-- Full suite: 104 passed.
+- Full suite: 117 passed.
 - The real 190-file delivery, converted end to end: 190 converted, 0 failures,
   **no warnings emitted at all**, and every output PDF's page count checked
   against the source's directory chain — all match.
 - Old engine vs new over the same 190 files: rendered output pixel-identical
-  (page-by-page hashes at 36 dpi), 27.4 s vs 27.3 s — the reader costs nothing.
+  (page-by-page hashes at 36 dpi), and 27.4 s → 16.6 s.
+- A 118 MB 30-page JPEG-in-TIFF converts in 2.1 s at 226 MB peak RSS, the case
+  the single-page delivery does not exercise.
 - The app driven to the result screen and screenshotted: the amber repaired line
   renders in-theme and names the two damaged files.
 - No new dependency and no new bundled resource, so `abstract_tools.spec` needs no

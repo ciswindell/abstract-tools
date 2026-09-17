@@ -12,6 +12,7 @@ from __future__ import annotations
 import functools
 import io
 import logging
+import os
 import shutil
 import struct
 from collections.abc import Callable
@@ -39,25 +40,30 @@ TIFF_EXTENSIONS = {".tif", ".tiff"}
 
 
 class _TiffReader(io.RawIOBase):
-    """The file object every TIFF is opened through. Two deliberate differences
-    from a plain ``open(path, "rb")``:
+    """The file object every TIFF is opened through.
 
-    * **No ``fileno()``.** For a compressed TIFF, Pillow hands the raw file
-      descriptor to libtiff, which moves the OS file offset; Pillow's own
-      buffered reads afterwards land on the wrong bytes. It then parses image
-      data as a tag directory and warns ``UserWarning: Truncated File Read``,
-      losing the file's EXIF — including the orientation that decides whether a
-      page comes out upright. Without a descriptor, Pillow feeds libtiff from
-      Python-side reads and stays in sync.
-    * **Reads past EOF are zero-padded** instead of returning short. A tag whose
-      data offset points past the end of the file otherwise aborts Pillow's
-      directory parse *before* it reads the pointer to the next page, silently
-      dropping every page after the damaged one.
+    Pillow hands the file *descriptor* to libtiff for a compressed TIFF, and
+    libtiff moves the OS file offset as it decodes. A buffered Python reader
+    then reads the wrong bytes afterwards: Pillow parses image data as a tag
+    directory and warns ``UserWarning: Truncated File Read``, losing the file's
+    EXIF — including the orientation that decides whether a page is written
+    upright. So this reader positions the descriptor immediately before every
+    read of its own, which libtiff's seeking cannot disturb, and still exposes
+    ``fileno()`` so libtiff decodes straight from the descriptor. (Hiding the
+    descriptor also fixes the EXIF, but drops Pillow into a path that reads the
+    whole file into memory once per page.)
+
+    Reads past the end of the file are zero-padded rather than returning short,
+    because a tag whose data offset runs past EOF otherwise aborts Pillow's
+    directory parse *before* it reads the pointer to the next page, silently
+    dropping every page after the damaged one.
     """
 
     def __init__(self, path: Path):
         super().__init__()
-        self._fp = open(path, "rb")  # noqa: SIM115 — closed in close()
+        self._fd = os.open(path, os.O_RDONLY)
+        self._size = os.fstat(self._fd).st_size
+        self._pos = 0
 
     def readable(self) -> bool:
         return True
@@ -65,30 +71,57 @@ class _TiffReader(io.RawIOBase):
     def seekable(self) -> bool:
         return True
 
+    def fileno(self) -> int:
+        return self._fd
+
+    def flush(self) -> None:
+        """Pillow flushes before handing the descriptor to libtiff."""
+
     def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
-        return self._fp.seek(offset, whence)
+        if whence == io.SEEK_SET:
+            self._pos = offset
+        elif whence == io.SEEK_CUR:
+            self._pos += offset
+        else:
+            self._pos = self._size + offset
+        os.lseek(self._fd, self._pos, os.SEEK_SET)  # libtiff decodes from here
+        return self._pos
 
     def tell(self) -> int:
-        return self._fp.tell()
+        return self._pos
 
     def read(self, size: int = -1) -> bytes:
         if size is None or size < 0:
-            return self._fp.read()
-        start = self._fp.tell()
-        data = self._fp.read(size)
+            size = max(0, self._size - self._pos)
+        os.lseek(self._fd, self._pos, os.SEEK_SET)  # undo any seeking libtiff did
+        chunks: list[bytes] = []
+        remaining = size
+        while remaining > 0:
+            block = os.read(self._fd, remaining)
+            if not block:
+                break
+            chunks.append(block)
+            remaining -= len(block)
+        data = b"".join(chunks)
         if len(data) < size:
             data += b"\x00" * (size - len(data))
-            self._fp.seek(start + size)  # keep tell() consistent with a full read
+        self._pos += size  # a padded read still advances, so tell() stays honest
         return data
 
     def readinto(self, buffer) -> int:  # noqa: ANN001 (buffer protocol)
-        data = self.read(len(buffer))
+        # Report the real end of the file here: read() pads deliberately, and a
+        # readinto that never returns 0 makes io.RawIOBase.readall() loop forever.
+        if self._pos >= self._size:
+            return 0
+        data = self.read(min(len(buffer), self._size - self._pos))
         buffer[: len(data)] = data
         return len(data)
 
     def close(self) -> None:
         try:
-            self._fp.close()
+            if self._fd >= 0:
+                os.close(self._fd)
+                self._fd = -1
         finally:
             super().close()
 
@@ -132,16 +165,23 @@ class TiffScan:
         return self.truncated or bool(self.partial_pages or self.damaged_tag_pages)
 
 
-def _read_ints(fp, endian: str, typ: int, count: int, raw: bytes, size: int) -> list[int]:
+def _read_ints(
+    fp, endian: str, typ: int, count: int, raw: bytes, size: int, file_size: int
+) -> list[int]:
     """Values of an integer-typed tag, whether stored inline or at an offset."""
     unit = _INT_TYPES.get(typ)
     if unit is None:
         return []
     if unit * count > len(raw):
         (offset,) = struct.unpack(endian + ("Q" if size == 8 else "L"), raw[:size])
+        want = unit * count
+        # A corrupt count can claim gigabytes. Reading it would raise MemoryError,
+        # which is not an OSError and so escapes every handler up to the UI thread.
+        if offset + want > file_size:
+            return []
         fp.seek(offset)
-        raw = fp.read(unit * count)
-        if len(raw) < unit * count:
+        raw = fp.read(want)
+        if len(raw) < want:
             return []
     code = {1: "B", 2: "H", 4: "L", 8: "Q"}[unit]
     return list(struct.unpack(f"{endian}{count}{code}", raw[: unit * count]))
@@ -200,10 +240,12 @@ def scan_tiff_ifds(path: Path) -> TiffScan:
                 fp.seek(next_ifd)
                 (entries,) = struct.unpack(count_code, fp.read(count_size))
                 block = fp.read(entries * entry_size)
-                offsets.append(next_ifd)
                 if len(block) < entries * entry_size:
-                    truncated = True  # the directory itself runs off the end
+                    # The directory runs off the end: this page cannot be read at
+                    # all, and counting it would condemn the intact pages before it.
+                    truncated = True
                     break
+                offsets.append(next_ifd)
                 tail_pos = fp.tell()
                 cut_pixels, bad_tag = _inspect_entries(
                     fp, block, endian, big, entry_size, offset_size, file_size
@@ -244,9 +286,9 @@ def _inspect_entries(
             if offset + width * count > file_size:
                 bad_tag = True
         if tag in (_STRIP_OFFSETS, _TILE_OFFSETS):
-            data_offsets = _read_ints(fp, endian, typ, count, raw, offset_size)
+            data_offsets = _read_ints(fp, endian, typ, count, raw, offset_size, file_size)
         elif tag in (_STRIP_BYTE_COUNTS, _TILE_BYTE_COUNTS):
-            byte_counts = _read_ints(fp, endian, typ, count, raw, offset_size)
+            byte_counts = _read_ints(fp, endian, typ, count, raw, offset_size, file_size)
     if not data_offsets or len(byte_counts) != len(data_offsets):
         return False, bad_tag  # nothing dependable to check the pixel data against
     cut = any(o + c > file_size for o, c in zip(data_offsets, byte_counts))
@@ -350,14 +392,28 @@ def _restore_lost_pages(img, scan: TiffScan) -> None:
     chain when that list is short. Filling the list in is enough to reach a page
     Pillow could not walk to; it still does all the decoding itself.
     """
-    if scan.pages <= getattr(img, "n_frames", 1):
-        return
     if not hasattr(img, "_frame_pos"):  # an unexpected Pillow — leave it alone
+        return
+    if scan.pages <= _pillow_page_count(img):
         return
     img._frame_pos = list(scan.offsets)
     img._n_frames = scan.pages
     img.is_animated = scan.pages > 1
     img._TiffImageFile__next = 0
+
+
+def _pillow_page_count(img) -> int:
+    """How many pages Pillow reaches on its own.
+
+    Reading ``n_frames`` walks the whole directory chain, and on a damaged file
+    that walk can raise — a chain ending at EOF reads as a phantom empty
+    directory once past-EOF reads are padded. Treat any failure as "Pillow got
+    nowhere", which is exactly when the offsets from the scan are needed.
+    """
+    try:
+        return img.n_frames
+    except Exception:  # noqa: BLE001 — a probe; never a reason to fail a file
+        return 1
 
 
 def _damage_notes(scan: TiffScan) -> list[str]:
@@ -499,8 +555,6 @@ def run_conversion(
     progress_cb(done, total, label) is called after each conversion completes,
     where total is the number of conversions.
     """
-    import os
-
     workers = workers or min(8, (os.cpu_count() or 2))
 
     actions = plan_actions(source_root, output_root, force=force)
