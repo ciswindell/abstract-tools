@@ -15,6 +15,7 @@ from abstract_tools.ui import theme
 from abstract_tools.ui.header import Header
 
 _ZOOM_STEP = 1.2
+_HINT_MS = 5000  # how long an inline hint stays up
 _MIN_ZOOM = 0.2
 _MAX_ZOOM = 5.0
 
@@ -188,6 +189,7 @@ class SegmentationScreen(QtWidgets.QWidget):
         v.setContentsMargins(0, 0, 0, 0)
         v.setSpacing(0)
         v.addWidget(self._build_controls())
+        v.addWidget(self._build_hint())
 
         self.canvas = QtWidgets.QScrollArea()
         self.canvas.setObjectName("canvas")
@@ -199,6 +201,31 @@ class SegmentationScreen(QtWidgets.QWidget):
         self.canvas.setWidget(self.page_image)
         v.addWidget(self.canvas, 1)
         return stage
+
+    def _build_hint(self) -> QtWidgets.QWidget:
+        """A one-line explanation strip under the controls, hidden until needed.
+
+        One label and one timer, reused: holding a key down re-writes the same
+        strip instead of opening another window.
+        """
+        self.hint_label = QtWidgets.QLabel()
+        self.hint_label.setObjectName("hint")
+        self.hint_label.setWordWrap(True)
+        self.hint_label.setVisible(False)
+        self._hint_timer = QtCore.QTimer(self)
+        self._hint_timer.setSingleShot(True)
+        self._hint_timer.setInterval(_HINT_MS)
+        self._hint_timer.timeout.connect(self._clear_hint)
+        return self.hint_label
+
+    def _show_hint(self, text: str) -> None:
+        self.hint_label.setText(text)
+        self.hint_label.setVisible(True)
+        self._hint_timer.start()
+
+    def _clear_hint(self) -> None:
+        self._hint_timer.stop()
+        self.hint_label.setVisible(False)
 
     def _build_controls(self) -> QtWidgets.QWidget:
         bar = QtWidgets.QWidget()
@@ -298,6 +325,7 @@ class SegmentationScreen(QtWidgets.QWidget):
             self._page_rows[self.selected_index].set_current(False)
         self.selected_index = global_index
         self._reviewed.add(global_index)
+        self._clear_hint()  # a hint about the page we just left is only noise here
         if global_index in self._page_rows:
             row = self._page_rows[global_index]
             row.set_current(True)
@@ -335,22 +363,21 @@ class SegmentationScreen(QtWidgets.QWidget):
 
     def mark_continuation(self) -> None:
         if self._is_source_start(self.selected_index):
-            self._warn_source_start()
+            self._explain_source_start()
             return
         self._classified.add(self.selected_index)
         self.model.set_continuation(self.selected_index)
         self.refresh_dots()
         self._advance()
 
-    def _warn_source_start(self) -> None:
-        box = QtWidgets.QMessageBox(self)
-        box.setIcon(QtWidgets.QMessageBox.Icon.Warning)
-        box.setWindowTitle("Can't change this page")
-        box.setText(
-            "This is the first page of a source file, so it cannot be "
-            "classified as a continuation page."
+    def _explain_source_start(self) -> None:
+        # Inline, not a dialog: the answer belongs next to the button that was
+        # pressed, and a dialog here interrupts a keyboard-driven pass.
+        source = self.model.pages[self.selected_index].source.file_number
+        self._show_hint(
+            f"Page {self.selected_index + 1} is the first page of {source} — "
+            "a new file always starts a new document, so it can't be a continuation."
         )
-        box.open()  # non-blocking modal
 
     def _advance(self) -> None:
         # Auto-advance to the very next page (never skips classified pages).
