@@ -139,7 +139,19 @@ class SegmentationScreen(QtWidgets.QWidget):
             return "none"
         return "first" if self.model.is_first_page(global_index) else "cont"
 
+    def refresh_dots(self) -> None:
+        """Re-colour the rail's dots in place.
+
+        Classifying changes a page's state, never the set of pages, so the rows
+        themselves must survive: rebuilding them leaves the new widgets without
+        geometry until the next event loop turn, and the scroll that follows the
+        current page then has nowhere to scroll to.
+        """
+        for global_index, row in self._page_rows.items():
+            row.set_dot(self._dot_state(global_index))
+
     def refresh_list(self) -> None:
+        # Rebuild every row — only for a change in the pages themselves.
         # Clear all rows except the title (index 0).
         while self._rail_layout.count() > 1:
             item = self._rail_layout.takeAt(1)
@@ -287,8 +299,11 @@ class SegmentationScreen(QtWidgets.QWidget):
         self.selected_index = global_index
         self._reviewed.add(global_index)
         if global_index in self._page_rows:
-            self._page_rows[global_index].set_current(True)
-            self._rail_scroll.ensureWidgetVisible(self._page_rows[global_index])
+            row = self._page_rows[global_index]
+            row.set_current(True)
+            # Follow the current page; Qt's default margin leaves a row of
+            # context either side rather than pinning it to an edge.
+            self._rail_scroll.ensureWidgetVisible(row)
         self._update_buttons()
         self._update_header()
         self._render()
@@ -315,7 +330,7 @@ class SegmentationScreen(QtWidgets.QWidget):
     def mark_first_page(self) -> None:
         self._classified.add(self.selected_index)
         self.model.set_first_page(self.selected_index)
-        self.refresh_list()
+        self.refresh_dots()
         self._advance()
 
     def mark_continuation(self) -> None:
@@ -324,7 +339,7 @@ class SegmentationScreen(QtWidgets.QWidget):
             return
         self._classified.add(self.selected_index)
         self.model.set_continuation(self.selected_index)
-        self.refresh_list()
+        self.refresh_dots()
         self._advance()
 
     def _warn_source_start(self) -> None:
