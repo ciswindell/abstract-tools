@@ -91,3 +91,36 @@ def test_shutdown_with_no_conversion_is_noop(qtbot):
     )
     qtbot.addWidget(ps)
     ps.shutdown()  # _thread is None — must not raise
+
+
+def test_repaired_files_are_named_on_the_result_screen(qtbot, tmp_path):
+    """A file that needed repair is called out so its PDF gets a look."""
+    from tests.tiff_builders import write_damaged_tiff
+
+    src = tmp_path / "scans"
+    _make_tiff(src / "fine.tif", pages=2)
+    write_damaged_tiff(src / "damaged.tif", [255, 0, 128], damaged_page=0)
+
+    tool = TiffConverterTool(on_back_to_tools=lambda: None)
+    qtbot.addWidget(tool)
+    tool.load_folder(src)
+    screen = tool.plan_screen
+    screen._on_finished(screen.do_convert())
+
+    assert screen.repaired_label.isVisibleTo(screen)
+    text = screen.repaired_label.text()
+    assert "damaged.tif" in text and "fine.tif" not in text
+    assert "0 failed" in screen.result_label.text()
+
+
+def test_healthy_folder_shows_no_repair_line(qtbot, tmp_path):
+    src = tmp_path / "scans"
+    _make_tiff(src / "a.tif", pages=2)
+
+    tool = TiffConverterTool(on_back_to_tools=lambda: None)
+    qtbot.addWidget(tool)
+    tool.load_folder(src)
+    screen = tool.plan_screen
+    screen._on_finished(screen.do_convert())
+
+    assert not screen.repaired_label.isVisibleTo(screen)

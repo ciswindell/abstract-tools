@@ -17,6 +17,15 @@ from abstract_tools.ui.header import Header
 CONVERTER_STEPS = ["1 · Open", "2 · Convert"]
 
 
+def _format_repairs(repaired: list[tuple[Path, str]], limit: int = 4) -> str:
+    """One line naming the damaged files, so the user knows what to check."""
+    shown = [f"{src.name} ({note})" for src, note in repaired[:limit]]
+    rest = len(repaired) - len(shown)
+    if rest > 0:
+        shown.append(f"and {rest} more")
+    return "Repaired, all pages kept — worth checking: " + "; ".join(shown)
+
+
 def _format_size(num_bytes: int) -> str:
     size = float(num_bytes)
     for unit in ("B", "KB", "MB", "GB", "TB"):
@@ -144,6 +153,15 @@ class PlanScreen(QtWidgets.QWidget):
         self.failures_label.setVisible(False)
         center.addWidget(self.failures_label)
 
+        # Files that converted in full but had damage worked around — every page
+        # is in the PDF, but these are the ones worth opening and checking.
+        self.repaired_label = QtWidgets.QLabel()
+        self.repaired_label.setObjectName("warn")
+        self.repaired_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.repaired_label.setWordWrap(True)
+        self.repaired_label.setVisible(False)
+        center.addWidget(self.repaired_label)
+
         self.new_folder_button = QtWidgets.QPushButton("Convert another folder  →")
         self.new_folder_button.setObjectName("primary")
         self.new_folder_button.clicked.connect(lambda: self.on_new_folder())
@@ -202,6 +220,7 @@ class PlanScreen(QtWidgets.QWidget):
         self.convert_button.setEnabled(False)
         self.result_label.setVisible(False)
         self.failures_label.setVisible(False)
+        self.repaired_label.setVisible(False)
 
         self._thread = QtCore.QThread(self)
         self._worker = ConversionWorker(
@@ -232,5 +251,8 @@ class PlanScreen(QtWidgets.QWidget):
             names = ", ".join(src.name for src, _ in summary.failures)
             self.failures_label.setText(f"Failed: {names}")
             self.failures_label.setVisible(True)
+        if summary.repaired:
+            self.repaired_label.setText(_format_repairs(summary.repaired))
+            self.repaired_label.setVisible(True)
         self.new_folder_button.setVisible(True)
         self.convert_button.setEnabled(True)
